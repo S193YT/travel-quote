@@ -85,15 +85,21 @@
     // 未滿15足歲：MRC 60萬＋OH1 60/120萬＋OAA（無 AT1／MR），查 RATES_U15
     if (ageBand === 'under15') {
       var oh = (global.TQ && TQ.childOh1Wan) ? TQ.childOh1Wan(life) : 60;
-      var cover15 = '未滿15歲離線表範圍：旅行社／快易保 × 亞洲14國 × MRC 60萬 × OH1 60／120萬 × OAA投保 × 1～30天';
+      var cover15 = '未滿15歲自動範圍：旅行社／快易保 × 亞洲14國 × MRC 60萬 × OH1 60／120萬 × OAA 可選 × 1～30天';
       if (!isFinite(days) || days <= 0) return { found: false, tip: '請先填投保天數' };
       if (rateType !== 'agency') return { found: false, tip: '尚無此費率類型（' + rateType + '）。' + cover15 + '；請用 GPTA 試算後手填' };
       if (region !== 'asia14') return { found: false, tip: '尚無「' + region + '」地區未滿15歲費率（OAA 亦僅限亞洲14國）。' + cover15 + '；請用 GPTA 試算後手填' };
-      if (!oaa) return { found: false, tip: '尚無「OAA 不投保」未滿15歲費率。' + cover15 + '；請用 GPTA 試算後手填' };
       if (days > 30) return { found: false, tip: '離線表僅到 30 天，目前 ' + days + ' 天請用 GPTA 試算後手填' };
       for (var u = 0; u < RATES_U15.length; u++) {
         var ru = RATES_U15[u];
         if (Number(ru.days) === days && Number(ru.oh1Wan) === oh) {
+          var CRu = global.LIFE_COMPONENT_RATES;
+          if (!oaa) {
+            if (!CRu) return { found: false, tip: '費率資料未載入；請重新整理' };
+            var pu = ru.premium - CRu.OAA[days - 1];
+            return { found: true, premium: pu, source: META_U15.source + '－OAA 旅行社費率',
+              tip: '自動：' + pu.toLocaleString('en-US') + ' 元（GPTA 未滿15歲 ' + ru.premium + ' － OAA ' + CRu.OAA[days - 1] + '／' + days + '天／MRC 60萬＋OH1 ' + oh + '萬，不含 OAA）' };
+          }
           return { found: true, premium: ru.premium, source: META_U15.source,
             tip: '自動：' + ru.premium.toLocaleString('en-US') + ' 元（GPTA 未滿15歲／' + days + '天／MRC 60萬＋OH1 ' + oh + '萬＋OAA）' };
         }
@@ -114,44 +120,47 @@
       return { found: false, tip: '請先填投保天數' };
     }
 
-    // 明確提示目前離線表的覆蓋範圍
-    var coverTip = '離線表範圍：旅行社／快易保 × 亞洲14國 × 15歲以上（66歲以上同 18～65 費率，僅 AT1 上限不同）× OAA投保 × AT1 100～2000萬（每100；15～17歲上限600）× 1～30天';
+    // 分項費率加總（旅行社 AT1＋MR＋OH1(亞洲14國)＋OAA）
+    var CR = global.LIFE_COMPONENT_RATES;
+    var coverTip = '自動範圍：旅行社費率 × 國外亞洲14國 × 15歲以上 × 1～180天 × AT1 表列保額（20～2000萬）× MR 表列（2～250萬）× OH1 10～200萬（每10）／250萬（1～30天）或 10/20/30/50/60/100/120/150/200/250萬（31～180天）× OAA 可選';
     if (rateType !== 'agency') {
       return { found: false, tip: '尚無此費率類型（' + rateType + '）。' + coverTip + '；請用 GPTA 試算後手填' };
     }
     if (region !== 'asia14') {
-      return { found: false, tip: '尚無「' + region + '」地區費率（OAA 亦僅限亞洲14國）。' + coverTip + '；請用 GPTA 試算後手填' };
+      return { found: false, tip: '「國外其他」（歐美、申根等）海外突發疾病 OH1 尚無官方費率表；請用 GPTA 試算後手填（AT1、MR 可查表，OH1 依地區不同）' };
     }
-    // 15～17歲 費率與 18～65 相同（GPTA 2026-10-06 抽查 500/5天=850、500/10天=1,119、300/5天=617）
-    // 66 歲以上費率亦同 18～65（僅 AT1 上限不同，上方已檢查）
     var adultBand = ai.valid ? ai.lifeRates === 'adult' : (ageBand === '18-65' || ageBand === '15-17');
     if (!adultBand) {
       return { found: false, tip: '尚無年齡帶「' + ageBand + '」費率。' + coverTip + '；請用 GPTA 試算後手填' };
     }
-    if (!oaa) {
-      return { found: false, tip: '尚無「OAA 不投保」費率。' + coverTip + '；請用 GPTA 試算後手填' };
+    if (!CR) return { found: false, tip: '費率資料未載入；請重新整理' };
+    if (days > 180 || days !== Math.floor(days)) {
+      return { found: false, tip: '投保天數 ' + days + ' 天超出費率表（1～180天）；請用 GPTA 試算後手填' };
     }
-    if (days > 30) {
-      return { found: false, tip: '離線表僅到 30 天，目前 ' + days + ' 天請用 GPTA 試算後手填' };
+    function cell(tbl, amt) {
+      var i = tbl.amts.indexOf(Number(amt));
+      return i < 0 ? null : tbl.rows[days - 1][i];
     }
-
-    for (var i = 0; i < RATES.length; i++) {
-      var r = RATES[i];
-      if (Number(r.days) !== days) continue;
-      if (Number(r.at1Wan) !== at1) continue;
-      if (Number(r.oh1Wan) !== Number(em.oh1)) continue;
-      if (Number(r.mrWan) !== Number(em.mr)) continue;
-      if (!!r.oaa !== oaa) continue;
-      return {
-        found: true,
-        premium: r.premium,
-        source: META.source,
-        tip: '自動：' + r.premium.toLocaleString('en-US') + ' 元（GPTA 離線表／' + days + '天／AT1 ' + at1 + '萬）'
-      };
+    var pAT1 = cell(CR.AT1, at1);
+    var pMR = (Number(em.mr) > 0) ? cell(CR.MR, em.mr) : 0;
+    var oh1Col = CR.OH1_asia14[String(Number(em.oh1))];
+    var pOH1 = (Number(em.oh1) > 0) ? (oh1Col ? oh1Col[days - 1] : null) : 0;
+    var pOAA = oaa ? CR.OAA[days - 1] : 0;
+    var miss = [];
+    if (pAT1 === null || pAT1 === undefined) miss.push('AT1 ' + at1 + '萬（表列：' + CR.AT1.amts.join('/') + '）');
+    if (pMR === null || pMR === undefined) miss.push('MR ' + em.mr + '萬');
+    if (pOH1 === null || pOH1 === undefined) miss.push('OH1 ' + em.oh1 + '萬（' + days + '天）');
+    if (miss.length) {
+      return { found: false, tip: '費率表無此保額：' + miss.join('、') + '。' + coverTip + '；請用 GPTA 試算後手填' };
     }
+    var total = pAT1 + pMR + pOH1 + pOAA;
     return {
-      found: false,
-      tip: '尚無此組合費率（' + days + '天／AT1 ' + at1 + '萬／OH1 ' + em.oh1 + '／MR ' + em.mr + '）。' + coverTip + '；請用 GPTA 試算後手填'
+      found: true,
+      premium: total,
+      source: '富邦人壽旅行社費率表（分項加總）',
+      parts: { at1: pAT1, mr: pMR, oh1: pOH1, oaa: pOAA },
+      tip: '自動：' + total.toLocaleString('en-US') + ' 元（旅行社費率／亞洲14國／' + days + '天：AT1 ' + at1 + '萬 ' + pAT1 +
+        '＋MR ' + em.mr + '萬 ' + pMR + '＋OH1 ' + em.oh1 + '萬 ' + pOH1 + (oaa ? '＋OAA ' + pOAA : '') + '）'
     };
   }
 

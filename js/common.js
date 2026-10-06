@@ -343,6 +343,7 @@
     return {
       life: L, prop: P, child: child,
       lifePremiumMissing: L.enabled && !isSet(life.premium),
+      propPremiumMissing: P.enabled && !isSet(prop.premium),
       lifeOverCap: L.enabled && !child && (function () { var a = ageInfo(quote.age); return a.valid && num(life.at1Wan) > a.at1Max; })(),
       death: L.at1 + P.death,
       transportDeath: L.at1 + L.transportExtra + P.death,
@@ -463,14 +464,18 @@
   /** 保費算式 HTML（壽＋產＝合計；純壽／純產只列一項） */
   function premiumFormula(c) {
     var L = c.life, P = c.prop;
-    if (c.lifePremiumMissing) {
-      var miss = c.lifeOverCap ? 'AT1 超過年齡上限' : '需另行試算';
-      return P.enabled
-        ? '壽 <b>' + miss + '</b> ＋ 產 <b>' + comma(P.premium) + '</b>（人壽保費另計）'
-        : '壽 <b>' + miss + '</b>（請以 GPTA 試算）';
+    if (!L.enabled && !P.enabled) return '<b>未選擇人壽或產險</b>';
+    if (c.lifePremiumMissing || c.propPremiumMissing) {
+      var lt = c.lifePremiumMissing ? (c.lifeOverCap ? 'AT1 超過年齡上限' : '需另行試算') : comma(L.premium);
+      var pt = c.propPremiumMissing ? '需另行試算' : comma(P.premium);
+      if (L.enabled && P.enabled) {
+        return '壽 <b>' + lt + '</b> ＋ 產 <b>' + pt + '</b>（' +
+          (c.lifePremiumMissing && c.propPremiumMissing ? '保費另計' : c.lifePremiumMissing ? '人壽保費另計' : '產險保費另計') + '）';
+      }
+      if (L.enabled) return '壽 <b>' + lt + '</b>（請以 GPTA 試算）';
+      return '產 <b>' + pt + '</b>（請以產險系統試算）';
     }
     if (L.enabled && P.enabled) return '壽 <b>' + comma(L.premium) + '</b> ＋ 產 <b>' + comma(P.premium) + '</b> ＝ <span class="prem-total">' + comma(c.premium) + '</span> 元';
-    if (!L.enabled && !P.enabled) return '<b>未選擇人壽或產險</b>';
     if (L.enabled) return '純人壽 ＝ <span class="prem-total">' + comma(c.premium) + '</span> 元';
     return '純產險 ＝ <span class="prem-total">' + comma(c.premium) + '</span> 元';
   }
@@ -578,11 +583,18 @@
   /** 卡片大字保費 */
   function priceInfo(c) {
     var L = c.life, P = c.prop;
-    if (c.lifePremiumMissing) {
-      return { amount: null, miss: c.lifeOverCap ? 'AT1 超過年齡上限' : '人壽保費需另行試算',
-        sub: P.enabled ? '產險 ' + comma(P.premium) + '＋人壽另計（請以 GPTA 試算）' : '請以 GPTA 試算' };
-    }
     if (!L.enabled && !P.enabled) return { amount: null, miss: '未選擇人壽或產險', sub: '' };
+    if (c.lifePremiumMissing || c.propPremiumMissing) {
+      var who = (c.lifePremiumMissing && c.propPremiumMissing) ? '人壽、產險' : c.lifePremiumMissing ? '人壽' : '產險';
+      var miss = (c.lifePremiumMissing && c.lifeOverCap) ? 'AT1 超過年齡上限' : who + '保費需另行試算';
+      var sub = '';
+      if (L.enabled && P.enabled) {
+        if (!c.lifePremiumMissing) sub = '人壽 ' + comma(L.premium) + '＋產險另計（請以產險系統試算）';
+        else if (!c.propPremiumMissing) sub = '產險 ' + comma(P.premium) + '＋人壽另計（請以 GPTA 試算）';
+        else sub = '人壽請以 GPTA、產險請以產險系統試算';
+      } else sub = L.enabled ? '請以 GPTA 試算' : '請以產險系統試算';
+      return { amount: null, miss: miss, sub: sub };
+    }
     if (L.enabled && P.enabled) return { amount: comma(c.premium), sub: '合計＝人壽 ' + comma(L.premium) + '＋產險 ' + comma(P.premium) };
     return { amount: comma(c.premium), sub: '總保費（' + (L.enabled ? '純人壽' : '純產險') + '）' };
   }

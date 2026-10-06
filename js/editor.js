@@ -30,7 +30,7 @@
     document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2200);
   }
 
-  /** AT1 以 50 萬為刻度（100～2000）；GPTA 離線表只有 100 萬整數倍，其餘（如 1250萬）需手填保費 */
+  /** AT1 以 50 萬為刻度（100～2000）；旅行社費率表列 100～500（每50）、600～2000（每100），其餘（如 1250萬）需手填保費 */
   var AT1_STEP = 50;
   function snapAt1(n) {
     n = Number(n);
@@ -212,7 +212,7 @@
     else if (st.days) {
       txt = '共 ' + st.days + ' 天' + (st.kept ? '（沿用原報價天數；請補填出發／回程日）'
         : st.override ? '（手動覆寫；日期算頭算尾為 ' + st.calendarDays + ' 天）' : '（算頭算尾）');
-      if (st.days > 30) { soft = true; warn = '⚠ 自動費率僅涵蓋 1～30 天，目前 ' + st.days + ' 天：超出範圍的保費請以 GPTA／產險試算後手填'; }
+      if (st.days > 30) { soft = true; warn = '⚠ 目前 ' + st.days + ' 天：人壽（亞洲14國）可自動算到 180 天；產險 DM 費率僅 2～10 天、未滿15歲人壽僅 1～30 天，其餘請以 GPTA／產險試算後手填'; }
     }
     if (v) v.textContent = txt;
     if (w) { w.hidden = !warn; w.textContent = warn; w.classList.toggle('soft', soft); }
@@ -437,7 +437,7 @@
         } else {
           if (p.life._premAuto || lr.overCap || lr.noRates) p.life.premium = null;
           p.life._premTip = (Q.schengen && !lr.overCap && !lr.noRates && TQ.ageInfo(Q.age).valid !== false)
-            ? '申根人壽需 GPTA「國外其他」費率（離線表僅亞洲14國＋OAA）；請手填保費'
+            ? '申根人壽需 GPTA「國外其他」費率（OH1 官方表僅亞洲14國）；請手填保費'
             : lr.tip;
           p.life._premAuto = false;
         }
@@ -582,7 +582,7 @@
       var cap = ai.valid ? ai.at1Max : 2000;
       h += selectField('人壽保額 AT1（萬）', b + 'life.at1Wan', withCurrent(at1Options(cap), plan.life.at1Wan, '超過年齡上限 ' + cap + ' 萬'), {
         hint: (ai.valid ? ai.label + '：AT1 100～' + cap + ' 萬' : '以 50 萬為單位（100～2000）') + '；OH1／MR 依下方人壽組合自動（進階可改）' +
-          '；保費查 GPTA 離線表（國外旅遊適用・100萬整數倍・亞洲14國），其餘請手填', auto: true
+          '；亞洲14國保費依旅行社費率表自動加總（AT1 表列保額；兩種人壽組合；1～180天），國外其他請手填', auto: true
       });
       var cb = TQ.lifeCombo(plan.life);
       h += '<label>人壽組合（DM 註1／註2）<select data-k="' + b + 'life.combo">' +
@@ -830,7 +830,7 @@
         '<span>門診 <b>' + TQ.fmtYuan(c.outpatient) + '</b></span>' +
         '<span>急診 <b>' + TQ.fmtYuan(c.er) + '</b></span>' +
         '<span>意外醫療 <b>' + TQ.fmtYuan(c.accidentMedical) + '</b></span>' +
-        '<span>保費 ' + lifeBadge + '壽<b>' + TQ.comma(c.life.premium) + '</b>＋' + propBadge + '產<b>' + TQ.comma(c.prop.premium) + '</b>＝<b>' + TQ.comma(c.premium) + '</b>元</span>';
+        '<span>保費 ' + lifeBadge + '壽<b>' + (!c.life.enabled ? '—' : c.lifePremiumMissing ? '需試算' : TQ.comma(c.life.premium)) + '</b>＋' + propBadge + '產<b>' + (!c.prop.enabled ? '—' : c.propPremiumMissing ? '需試算' : TQ.comma(c.prop.premium)) + '</b>＝' + ((c.lifePremiumMissing || c.propPremiumMissing) ? '<b>待試算</b>' : '<b>' + TQ.comma(c.premium) + '</b>元') + '</span>';
     });
     var ri = TQ.regionInfo(Q.destination);
     document.getElementById('regionHint').textContent = isDomesticDest()
@@ -852,17 +852,17 @@
     if (dsC.days > 180 && Q.plans.some(function (p) { return p.life && p.life.enabled; })) add('err', '共 ' + dsC.days + ' 天：Go安行國外旅遊最高投保天數為 180 天（DM 第2頁）。');
     var riC = TQ.regionInfo(Q.destination);
     if (riC.ambiguous.length) add('warn', '目的地含「' + riC.ambiguous.join('、') + '」：DM 未明列是否屬「美國、加拿大」或「歐洲」，人壽 OH1 地區限額預設 100%；如確認適用請到「行程進階」手動調整。');
-    if (dsC.days > 30) add('warn', '共 ' + dsC.days + ' 天：自動費率僅涵蓋 1～30 天，超出範圍的保費請以 GPTA／產險試算後手填。');
+    if (dsC.days > 30) add('warn', '共 ' + dsC.days + ' 天：人壽亞洲14國可自動算到 180 天；產險 DM 費率僅 2～10 天、未滿15歲人壽僅 1～30 天，其餘請以 GPTA／產險試算後手填。');
     Q.plans.forEach(function (p) {
       var n = p.name || '';
       if (p.life && p.life.enabled) {
         if (!TQ.num(p.life.at1Wan)) add('err', n + '：人壽 AT1 未填。');
-        if (!TQ.isSet(p.life.premium)) add('err', n + '：人壽保費未填（' + (p.life._premTip || '請以 GPTA 試算') + '）。');
+        if (!TQ.isSet(p.life.premium)) add('err', n + '：人壽保費需另行試算、尚未填入（' + (p.life._premTip || '請以 GPTA 試算') + '）；未填前客戶頁／比較表／總表圖顯示「需另行試算」。');
         else if (!p.life._premAuto) add('warn', n + '：人壽保費為手填／缺表。');
         else add('ok', n + '：人壽保費已自動帶入。');
       }
       if (!propOn(p)) return;
-      if (!TQ.isSet(p.property.premium)) add('err', n + '：產險保費未填（' + (p.property._premTip || '') + '）。');
+      if (!TQ.isSet(p.property.premium)) add('err', n + '：產險保費需另行試算、尚未填入（' + (p.property._premTip || 'DM 表列僅 2～10 天') + '）；未填前客戶頁／比較表／總表圖顯示「需另行試算」。');
       else if (!p.property._premAuto) add('warn', n + '：產險保費非 DM 自動（' + (p.property._premTip || '手填') + '）。');
       else add('ok', n + '：產險保費已自動帶入（DM）。');
       if (!TQ.num(p.property.deathWan)) add('warn', n + '：產險意外身故失能未填。');
