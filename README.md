@@ -31,3 +31,8 @@
 3. Settings → Pages → Source 選 `Deploy from a branch`，branch `main`、資料夾 `/ (root)`。
 4. 網址會是 `https://<帳號>.github.io/<repo>/editor.html`（客戶頁為 `.../index.html#q=…`）。
 注意：GitHub Pages 免費版的 repo 必須是 public（程式碼與費率表任何人可看到）；頁面已加 `noindex`。
+
+## 版面（115/10/06 DM 美編）
+客戶頁、三方案總表圖、編輯器預覽皆改為與昶勝軍德國 DM（dm_3options）相同的視覺：
+青綠→深藍漸層頁首＋標籤膠囊＋行程膠囊、方案卡色塊標頭（方案一深藍／方案二湖藍／方案三青綠）、推薦方案金框、
+大字保費、DM 樣式「主要保障比較」表、深藍漸層＋金線頁尾（金框圓形 logo、青綠電話膠囊）。計算與資料未變更。

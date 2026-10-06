@@ -526,15 +526,178 @@
     return items;
   }
 
+  /* ---------- DM 版面輔助（115/10/06 美編：同昶勝軍德國 DM） ---------- */
+  var CN_NUM = '一二三四五六七八九十';
+  function splitPlanName(name, idx) {
+    var s = String(name || '').trim();
+    var m = /^(方案\s*[一二三四五六七八九十0-9]+)[\s\u3000:：・\-]*(.*)$/.exec(s);
+    if (m) return { no: m[1].replace(/\s+/g, ''), nm: m[2] || '' };
+    return { no: '方案' + (CN_NUM.charAt(idx) || String(idx + 1)), nm: s };
+  }
+  function quoteKinds(quote) {
+    var plans = (quote && quote.plans) || [];
+    return {
+      life: plans.some(function (p) { return p.life && p.life.enabled; }),
+      prop: plans.some(function (p) { return !p.property || p.property.enabled !== false; })
+    };
+  }
+  function companiesText(quote, sep) {
+    var k = quoteKinds(quote), a = [];
+    if (k.life) a.push('富邦人壽');
+    if (k.prop) a.push('富邦產險');
+    return a.join(sep || '、');
+  }
+  function heroTagText(quote) {
+    var n = ((quote && quote.plans) || []).length;
+    var co = companiesText(quote, ' ／ ');
+    return (co ? co + '｜' : '') + (n > 0 && n <= 10 ? CN_NUM.charAt(n - 1) : n) + '方案比較';
+  }
+  function heroBadgesHtml(quote, cls) {
+    cls = cls || 'hero-badge';
+    var h = '';
+    if (quote.schengen) h += '<span class="' + cls + '">申根／計畫二</span>';
+    var pct = num(quote.lifeRegionPct || 100);
+    if (quote.plans && quoteKinds(quote).life && pct !== 100) {
+      h += '<span class="' + cls + ' gold">人壽醫療限額 ' + pct + '%・' + esc(regionLabel(pct)) + '</span>';
+    }
+    return h;
+  }
+  function agentParts(a) {
+    var segs = String(a.unit || '').split(/[・·]/).map(function (s) { return s.trim(); }).filter(Boolean);
+    var team = segs.length > 1 ? segs[segs.length - 1] : '';
+    var org = segs.length > 1 ? segs.slice(0, -1).join('・') : String(a.unit || '');
+    return {
+      line: (team ? team + ' ' : '') + (a.name || '') + (a.title || ''),
+      org: '富邦人壽' + (org ? ' ' + org : '')
+    };
+  }
+  function disclaimerText(quote) {
+    var co = companiesText(quote, '、') || '保險公司';
+    return '以上保費為試算結果，實際以' + co + '核保為準；保障內容以保單條款為準。';
+  }
+  /** 卡片大字保費 */
+  function priceInfo(c) {
+    var L = c.life, P = c.prop;
+    if (c.lifePremiumMissing) {
+      return { amount: null, miss: c.lifeOverCap ? 'AT1 超過年齡上限' : '人壽保費需另行試算',
+        sub: P.enabled ? '產險 ' + comma(P.premium) + '＋人壽另計（請以 GPTA 試算）' : '請以 GPTA 試算' };
+    }
+    if (!L.enabled && !P.enabled) return { amount: null, miss: '未選擇人壽或產險', sub: '' };
+    if (L.enabled && P.enabled) return { amount: comma(c.premium), sub: '合計＝人壽 ' + comma(L.premium) + '＋產險 ' + comma(P.premium) };
+    return { amount: comma(c.premium), sub: '總保費（' + (L.enabled ? '純人壽' : '純產險') + '）' };
+  }
+  function priceHtml(c, pre) {
+    pre = pre || 'price';
+    var p = priceInfo(c);
+    return '<div class="' + pre + '-box">' + (p.amount !== null
+      ? '<div class="' + pre + '"><span class="c">NT$</span><span class="n">' + p.amount + '</span></div>'
+      : '<div class="' + pre + ' miss">' + esc(p.miss) + '</div>') +
+      (p.sub ? '<div class="' + pre + '-sub">' + esc(p.sub) + '</div>' : '') + '</div>';
+  }
+  /** 主要保障比較表資料（全部由 computePlan 計算，不另行推算） */
+  function cmpCell(v, sub, na, cls) { return { v: v, sub: sub || '', na: !!na, cls: cls || '' }; }
+  var NA = function () { return cmpCell('—', '', true); };
+  function compareData(quote, opt) {
+    opt = opt || {};
+    var plans = quote.plans || [];
+    var cs = plans.map(function (p) { return computePlan(p, quote); });
+    var rows = [];
+    function both(c, lt, pt) { return (c.life.enabled && c.prop.enabled) ? lt + '＋' + pt : ''; }
+    function amtRow(k, ksub, get, lt, pt) {
+      rows.push({ k: k, ksub: ksub || '', cells: cs.map(function (c) {
+        var v = get(c);
+        return v > 0 ? cmpCell(fmtYuan(v), both(c, lt(c), pt(c))) : NA();
+      }) });
+    }
+    rows.push({ k: '總保費', cls: 'prem', cells: cs.map(function (c) {
+      var p = priceInfo(c);
+      if (p.amount === null) return cmpCell(p.miss, '', false, 'miss');
+      return cmpCell('NT$ ' + p.amount, (c.life.enabled && c.prop.enabled) ? '人壽 ' + comma(c.life.premium) + '＋產險 ' + comma(c.prop.premium) : '');
+    }) });
+    var anyChild = cs.some(function (c) { return c.child; });
+    amtRow('意外身故・失能', '', function (c) { return c.death; }, function (c) { return fmtShort(c.life.at1); }, function (c) { return fmtShort(c.prop.death); });
+    if (!anyChild && cs.some(function (c) { return transportLine(c); })) {
+      rows.push({ k: '交通意外身故', ksub: '大眾運輸・自行車・汽車', cells: cs.map(function (c) {
+        var t = transportLine(c);
+        if (t) return cmpCell(t.total, '含人壽交通加給 ' + fmtShort(c.life.transportExtra));
+        return c.death > 0 ? cmpCell(fmtYuan(c.transportDeath), '同一般意外身故') : NA();
+      }) });
+    }
+    if (anyChild && cs.some(function (c) { return c.life.enabled; })) {
+      rows.push({ k: '兒童傷害醫療 MRC', ksub: '每一事故最高', cells: cs.map(function (c) {
+        return (c.life.enabled && c.child) ? cmpCell(fmtYuan(c.life.mrc)) : NA();
+      }) });
+    }
+    amtRow('海外突發疾病 住院', '保期內最高', function (c) { return c.hospital; }, function (c) { return fmtShort(c.life.hospital); }, function (c) { return fmtShort(c.prop.hospital); });
+    amtRow('海外突發疾病 門診', '人壽為每日最高', function (c) { return c.outpatient; }, function (c) { return fmtShort(c.life.outpatient); }, function (c) { return fmtShort(c.prop.outpatient); });
+    amtRow('海外突發疾病 急診', '人壽為每日最高', function (c) { return c.er; }, function (c) { return fmtShort(c.life.er); }, function (c) { return fmtShort(c.prop.er); });
+    amtRow('意外醫療', '每一事故最高', function (c) { return c.accidentMedical; },
+      function (c) { return c.life.child ? 'MRC ' + fmtShort(c.life.mrc) : fmtShort(c.life.mr); }, function (c) { return fmtShort(c.prop.accidentMedical); });
+    if (cs.some(function (c) { return c.life.enabled && c.life.regionPct !== 100; })) {
+      var rp = 100;
+      cs.forEach(function (c) { if (c.life.enabled && c.life.regionPct !== 100) rp = c.life.regionPct; });
+      rows.push({ k: '人壽醫療地區限額', ksub: regionLabel(rp), cells: cs.map(function (c) {
+        if (!c.life.enabled) return NA();
+        return cmpCell(c.life.regionPct + '%', c.life.regionPct !== 100 ? 'OH1 ' + fmtShort(c.life.oh1) + ' × ' + c.life.regionPct + '%' : '');
+      }) });
+    }
+    rows.push({ k: '旅遊不便險', ksub: '', cells: cs.map(function (c) { return c.prop.enabled ? cmpCell('✓ 含', '', false, 'yes') : NA(); }) });
+    var more = 0;
+    if (opt.inconv) {
+      var names = [];
+      plans.forEach(function (p, i) {
+        if (!cs[i].prop.enabled) return;
+        (p.inconvenience || []).forEach(function (it) { if (it && it.name && names.indexOf(it.name) < 0) names.push(it.name); });
+      });
+      more = Math.max(0, names.length - opt.inconv);
+      names.slice(0, opt.inconv).forEach(function (n) {
+        rows.push({ k: n, ksub: '', cls: 'inc', cells: plans.map(function (p, i) {
+          if (!cs[i].prop.enabled) return NA();
+          var hit = null;
+          (p.inconvenience || []).forEach(function (it) { if (!hit && it && it.name === n) hit = it; });
+          return (hit && isSet(hit.amount) && String(hit.amount) !== '') ? cmpCell(String(hit.amount), '', false, 'txt') : NA();
+        }) });
+      });
+    }
+    return { plans: plans, cs: cs, rows: rows, more: more };
+  }
+  function compareTableHtml(quote, opt) {
+    var d = compareData(quote, opt);
+    if (!d.plans.length) return '';
+    var h = '<table class="cmp"><thead><tr><th class="k">保障項目</th>';
+    d.plans.forEach(function (p, i) {
+      var nm = splitPlanName(p.name, i);
+      h += '<th class="pc' + (i % 3 + 1) + (p.recommended ? ' reco' : '') + '">' + esc(nm.no) + (nm.nm ? '<small>' + esc(nm.nm) + '</small>' : '') + '</th>';
+    });
+    h += '</tr></thead><tbody>';
+    d.rows.forEach(function (r) {
+      h += '<tr' + (r.cls ? ' class="' + r.cls + '"' : '') + '><td class="k">' + esc(r.k) + (r.ksub ? '<small>' + esc(r.ksub) + '</small>' : '') + '</td>';
+      r.cells.forEach(function (c, i) {
+        var cls = [];
+        if (d.plans[i].recommended) cls.push('reco');
+        if (c.na) cls.push('na');
+        if (c.cls) cls.push(c.cls);
+        h += '<td' + (cls.length ? ' class="' + cls.join(' ') + '"' : '') + '>' + esc(c.v) + (c.sub ? '<small>' + esc(c.sub) + '</small>' : '') + '</td>';
+      });
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+    if (d.more > 0) h += '<p class="cmp-more">…另有 ' + d.more + ' 項不便險／其他保障，詳見完整報價</p>';
+    return h;
+  }
+
   function renderPlanCard(plan, quote, idx) {
     var c = computePlan(plan, quote);
     var L = c.life, P = c.prop, on = L.enabled, pon = P.enabled;
+    var nm = splitPlanName(plan.name, idx);
     var h = '';
-    h += '<article class="plan-card' + (plan.recommended ? ' is-reco' : '') + '" id="plan-' + (idx + 1) + '">';
+    h += '<article class="plan-card pc' + (idx % 3 + 1) + (plan.recommended ? ' is-reco' : '') + '" id="plan-' + (idx + 1) + '">';
     if (quote.sample) h += '<div class="card-sample">範例</div>';
-    h += '<header class="plan-head"><div class="plan-title"><span class="plan-no">' + esc(plan.name || ('方案' + (idx + 1))) + '</span>' +
+    h += '<header class="plan-head"><div class="plan-title"><span class="plan-no">' + esc(nm.no) + '</span>' +
       (plan.recommended ? '<span class="reco-badge">推薦</span>' : '') + '</div>' +
-      '<div class="plan-tagline">' + esc(plan.tagline || '') + '</div></header>';
+      (nm.nm ? '<div class="plan-nm">' + esc(nm.nm) + '</div>' : '') + '</header>';
+    if (plan.tagline) h += '<div class="plan-tagline">' + (plan.recommended ? '♛ ' : '') + esc(plan.tagline) + '</div>';
+    h += priceHtml(c);
 
     if (c.child) {
       // 未滿15足歲：人壽無 AT1、產險兒童方案無身故失能 → 主框改顯示兒童主約
@@ -621,24 +784,24 @@
     var mode = quote.dateFormat === 'ad' ? 'ad' : 'roc';
     var dates = '';
     if (quote.startDate || quote.endDate) dates = fmtDate(quote.startDate, mode) + ' ～ ' + fmtDate(quote.endDate, mode);
-    var pctH = num(quote.lifeRegionPct || 100);
-    var anyLifeH = (quote.plans || []).some(function (p) { return p.life && p.life.enabled; });
-    var kicker = '旅平險 三方案報價' + (quote.schengen ? '　<span class="hero-schengen">申根／計畫二</span>' : '') +
-      (anyLifeH && pctH !== 100 ? ' <span class="hero-schengen hero-region">人壽醫療限額 ' + pctH + '%</span>' : '');
-    return renderBrand('brand') + '<div class="hero-kicker">' + kicker + '</div>' +
-      '<h1 class="hero-title"><span class="dest">' + esc(quote.destination || '—') + '</span><span class="days">' +
-      esc(quote.days || '—') + '<small> 天</small></span></h1>' +
-      (dates ? '<div class="hero-dates">' + esc(dates) + '</div>' : '');
+    var a = agentParts(agentOf(quote));
+    var dest = quote.destination || '—';
+    return '<div class="hero-tags"><span class="hero-tag">' + esc(heroTagText(quote)) + '</span>' + heroBadgesHtml(quote) + '</div>' +
+      '<h1 class="hero-title"><span class="dest">' + esc(dest) + '</span><span class="ttl">旅遊保障方案</span></h1>' +
+      '<div class="hero-sub">旅平險組合方案試算　<span class="nw"><b>' + esc(a.line) + '</b> 為您規劃</span></div>' +
+      '<div class="hero-trip"><span>✈ ' + esc(dest) + '</span>' +
+      (dates ? '<span class="hero-dates">📅 ' + esc(dates) + '</span>' : '') +
+      '<span class="days">共 <b>' + esc(quote.days || '—') + '</b> 天</span></div>';
   }
 
   function renderFooter(quote) {
-    var a = agentOf(quote);
-    return '<div class="sig-wrap"><img class="sig-logo" src="' + BRAND.logo + '" alt="' + esc(BRAND.logoAlt) + '" width="56" height="56">' +
+    var a = agentOf(quote), ap = agentParts(a);
+    return '<div class="sig-wrap"><img class="sig-logo" src="' + BRAND.logo + '" alt="' + esc(BRAND.logoAlt) + '" width="88" height="88">' +
       '<div class="sig-text"><div class="sig-kicker">您的專屬保險顧問</div>' +
-      '<div class="sig-unit">富邦人壽 ' + esc(a.unit) + '</div>' +
-      '<div class="sig-people"><span><b>' + esc(a.name) + '</b> ' + esc(a.title) + '</span></div>' +
+      '<div class="sig-name">' + esc(ap.line) + '</div>' +
+      '<div class="sig-unit">' + esc(ap.org) + '</div></div>' +
       (a.phone ? '<a class="sig-phone" href="' + esc(telHref(a.phone)) + '">☎ ' + esc(a.phone) + '</a>' : '') +
-      '</div></div>';
+      '</div><div class="sig-disc">' + esc(disclaimerText(quote)) + '</div>';
   }
 
   function renderQuote(quote, root) {
@@ -647,10 +810,15 @@
     if (quote.sample) html += '<div class="sample-banner" role="note">⚠ 範例資料・非正式報價（僅供版面示意）</div>';
     html += '<header class="hero">' + renderHeader(quote) + '</header>';
     html += '<nav class="plan-nav">' + plans.map(function (p, i) {
-      return '<a href="#plan-' + (i + 1) + '" data-target="plan-' + (i + 1) + '">' + esc(p.name || ('方案' + (i + 1))) + '</a>';
-    }).join('') + '</nav>';
+      var nm = splitPlanName(p.name, i);
+      return '<a href="#plan-' + (i + 1) + '" data-target="plan-' + (i + 1) + '" class="pc' + (i % 3 + 1) + '">' + esc(nm.no) + (nm.nm ? '<span class="nav-nm"> ' + esc(nm.nm) + '</span>' : '') + '</a>';
+    }).join('') + '<a href="#plan-cmp" data-target="plan-cmp" class="nav-cmp">比較</a></nav>';
     html += '<main class="plans">' + plans.map(function (p, i) { return renderPlanCard(p, quote, i); }).join('') + '</main>';
-    html += '<section class="notes-wrap">' + renderNotes(quote) + '</section>';
+    if (plans.length) {
+      html += '<section class="cmp-card" id="plan-cmp"><h2 class="sec-title big">主要保障比較<small>— 表示不含此項保障</small></h2>' +
+        '<div class="cmp-scroll">' + compareTableHtml(quote) + '</div></section>';
+    }
+    html += '<section class="notes-wrap"><h2 class="sec-title big">注意事項</h2>' + renderNotes(quote) + '</section>';
     html += '<footer class="site-footer">' + renderFooter(quote) + '</footer>';
     root.innerHTML = html;
     // 方案導覽：用 scrollIntoView，避免改動 #q= 分享資料
@@ -921,6 +1089,8 @@
     CHILD_MRC_WAN: CHILD_MRC_WAN, CHILD_OH1_OPTIONS: CHILD_OH1_OPTIONS, propertyAgeCheck: propertyAgeCheck,
     BRAND: BRAND, renderBrand: renderBrand, DEFAULT_AGENT: DEFAULT_AGENT, agentOf: agentOf, telHref: telHref,
     bracket: bracket, deathSplit: deathSplit, brandLogoReady: function () { return brandLogoReady; },
-    renderQuote: renderQuote, renderPlanCard: renderPlanCard, titleFor: titleFor, esc: esc
+    renderQuote: renderQuote, renderPlanCard: renderPlanCard, titleFor: titleFor, esc: esc,
+    splitPlanName: splitPlanName, priceInfo: priceInfo, priceHtml: priceHtml, compareData: compareData, compareTableHtml: compareTableHtml,
+    heroTagText: heroTagText, heroBadgesHtml: heroBadgesHtml, agentParts: agentParts, disclaimerText: disclaimerText, companiesText: companiesText
   };
 })(window);
