@@ -1,4 +1,4 @@
-// 範例資料（非正式報價）：日本 7 天／40 歲；保費取自 js/life-rates.js（GPTA 離線表）與 js/presets.js（新快樂旅綜+ DM）。內容同 data/sample_quote.json
+// 範例資料（非正式報價）：日本 7 天（10/13 08:30～10/19 21:40，每滿 24 小時一天）／40 歲；保費取自 js/life-rates.js（GPTA 離線表）與 js/presets.js（新快樂旅綜+ DM）。內容同 data/sample_quote.json
 window.SAMPLE_QUOTE = {
   "v": 1,
   "sample": true,
@@ -6,7 +6,10 @@ window.SAMPLE_QUOTE = {
   "age": 40,
   "days": 7,
   "startDate": "2026-10-13",
+  "startTime": "08:30",
   "endDate": "2026-10-19",
+  "endTime": "21:40",
+  "dayRule": "h24",
   "dateFormat": "roc",
   "lifeRateType": "agency",
   "lifeRegion": "asia14",

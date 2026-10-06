@@ -9,14 +9,14 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>旅平險組合方案試算報價系統｜昶勝軍</title>
-<link rel="icon" type="image/png" href="img/favicon.png?v=20261006fr5">
-<link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=20261006fr5">
-<link rel="stylesheet" href="css/style.css?v=20261006fr5">
-<link rel="stylesheet" href="css/editor.css?v=20261006fr5">
+<link rel="icon" type="image/png" href="img/favicon.png?v=20261006fr6">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=20261006fr6">
+<link rel="stylesheet" href="css/style.css?v=20261006fr6">
+<link rel="stylesheet" href="css/editor.css?v=20261006fr6">
 </head>
 <body class="editor-body">
 <header class="ed-top">
-  <div class="ed-brand"><img class="ed-logo" src="img/logo.png?v=20261006fr5" alt="昶勝軍" width="42" height="42"><span class="ed-brand-text"><span class="ed-slogan">富邦人壽 高秉通訊處・昶勝軍</span><span class="ed-title"><b>旅平險組合方案試算報價系統</b><span class="ed-internal">內部使用・請勿傳給客戶</span></span></span></div>
+  <div class="ed-brand"><img class="ed-logo" src="img/logo.png?v=20261006fr6" alt="昶勝軍" width="42" height="42"><span class="ed-brand-text"><span class="ed-slogan">富邦人壽 高秉通訊處・昶勝軍</span><span class="ed-title"><b>旅平險組合方案試算報價系統</b><span class="ed-internal">內部使用・請勿傳給客戶</span></span></span></div>
   <div class="ed-actions">
     <button type="button" class="btn btn-gold" id="btnSummaryPng">🖼 下載三方案總表圖</button>
     <button type="button" class="btn" id="btnCopyLink" title="把客戶頁網址（報價資料全在網址內）複製下來貼到 LINE">🔗 複製客戶頁連結</button>
@@ -65,14 +65,17 @@
     </section>
 
     <section class="ed-card">
-      <h2>行程資料 <small>（頁首只顯示：目的地、天數、日期；不顯示年齡）</small></h2>
+      <h2>行程資料 <small>（頁首只顯示：目的地、保險期間（日期＋時間）、天數；不顯示年齡）</small></h2>
       <div class="grid g2">
         <label>目的地<input type="text" data-k="destination" placeholder="例：日本／法國（申根）" aria-describedby="destWarn"><span class="dest-warn" id="destWarn" role="alert" hidden></span></label>
         <label>被保險人年齡（足歲・必填）<input type="number" min="0" max="100" step="1" data-k="age" inputmode="numeric" placeholder="例：35（不會顯示在客戶頁）" aria-describedby="ageWarn ageHint"><span class="dest-warn" id="ageWarn" role="alert" hidden></span><span class="hint" id="ageHint"></span></label>
         <div class="date-row">
           <label>出發日<input type="date" data-k="startDate"></label>
+          <label>出發時間<input type="time" step="60" data-k="startTime" aria-describedby="periodHint"></label>
           <label>回程日<input type="date" data-k="endDate"></label>
-          <div class="days-auto" id="daysAuto" aria-live="polite"><span class="days-auto-lbl">天數（依日期自動）</span><span class="days-auto-val" id="daysAutoVal"></span></div>
+          <label>回程時間<input type="time" step="60" data-k="endTime" aria-describedby="periodHint"></label>
+          <div class="days-auto" id="daysAuto" aria-live="polite"><span class="days-auto-lbl">保險期間（依起訖時間自動）</span><span class="days-auto-val" id="daysAutoVal"></span><span class="days-auto-sub" id="daysAutoSub"></span></div>
+          <p class="period-hint" id="periodHint">⏱ 每滿 24 小時算一天，未滿 24 小時以一天計（同富邦公司系統）。請填<b>班機實際起飛時間</b>與<b>回到台灣的時間</b>；未填時間視為同一時刻（天數＝日期相減），可能少算一天。</p>
           <span class="dest-warn" id="dateWarn" role="alert" hidden></span>
         </div>
         <label>日期顯示
@@ -99,8 +102,8 @@
             <span class="hint">申根勾選時會自動改為「國外其他」</span>
           </label>
           <label>投保天數覆寫（選填）
-            <input type="number" min="1" max="365" step="1" data-k="daysOverride" inputmode="numeric" placeholder="空白＝依日期算頭算尾">
-            <span class="hint">依保單起訖時刻計天時用（例：11/20 晚上 20:00 出發～12/05 20:00＝15 天）</span>
+            <input type="number" min="1" max="365" step="1" data-k="daysOverride" inputmode="numeric" placeholder="空白＝依起訖時間每 24 小時計">
+            <span class="hint">一般不需填：天數已依出發／回程時間每滿 24 小時計（例：11/20 20:00～12/05 20:00＝15 天）。僅在公司系統試算天數不同時手動指定</span>
           </label>
           <label>年齡區間（依上方年齡自動・客戶頁不顯示）
             <select data-k="ageBand" disabled>
@@ -136,7 +139,7 @@
     </section>
 
     <section class="ed-card checks" id="checks"></section>
-  <p class="build-ver" id="buildVersion">昶勝軍版 115/10/06・方案類型選單＋快速套用・旅行社分項費率（AT1 114/05/15、MR/OTA 115/06/11）</p>
+  <p class="build-ver" id="buildVersion">昶勝軍版 115/10/06・天數依起訖時間每 24 小時計・方案類型選單＋快速套用・旅行社分項費率（AT1 114/05/15、MR/OTA 115/06/11）</p>
   </form>
 
   <aside class="ed-preview">
@@ -151,15 +154,15 @@
   </aside>
 </div>
 
-<script src="js/vendor/pako.min.js?v=20261006fr5"></script>
-<script src="js/vendor/html2canvas.min.js?v=20261006fr5"></script>
-<script src="js/agent-profile.js?v=20261006fr5"></script>
-<script src="js/common.js?v=20261006fr5"></script>
-<script src="js/sample-data.js?v=20261006fr5"></script>
-<script src="js/presets.js?v=20261006fr5"></script>
-<script src="js/life-component-rates.js?v=20261006fr5"></script>
-<script src="js/life-rates.js?v=20261006fr5"></script>
-<script src="js/summary-export.js?v=20261006fr5"></script>
-<script src="js/editor.js?v=20261006fr5"></script>
+<script src="js/vendor/pako.min.js?v=20261006fr6"></script>
+<script src="js/vendor/html2canvas.min.js?v=20261006fr6"></script>
+<script src="js/agent-profile.js?v=20261006fr6"></script>
+<script src="js/common.js?v=20261006fr6"></script>
+<script src="js/sample-data.js?v=20261006fr6"></script>
+<script src="js/presets.js?v=20261006fr6"></script>
+<script src="js/life-component-rates.js?v=20261006fr6"></script>
+<script src="js/life-rates.js?v=20261006fr6"></script>
+<script src="js/summary-export.js?v=20261006fr6"></script>
+<script src="js/editor.js?v=20261006fr6"></script>
 </body>
 </html>

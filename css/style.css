@@ -300,3 +300,7 @@ table.cmp { width: 100%; min-width: 340px; table-layout: fixed; border-collapse:
 .plan-nav .nav-tier { display: none; font-size: 13px; font-weight: 700; }
 @media (max-width: 759px) { .plan-nav .nav-tier { display: inline; } }
 .pv-frame:not(.full) .plan-nav .nav-tier { display: inline; }
+
+/* fr6：保險期間（起訖日時）— 起訖各自不換行 */
+.hero-trip .pd-lbl, .sum-trip .pd-lbl { font-size: .82em; opacity: .9; letter-spacing: .04em; }
+.hero-trip .pd-t, .sum-trip .pd-t { font-style: normal; font-weight: 700; white-space: nowrap; }

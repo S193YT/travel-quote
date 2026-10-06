@@ -22,6 +22,9 @@
   var schengenManual = false;
   /** 舊分享連結／草稿只有天數、沒有出發回程日 → 沿用其天數（直到使用者填日期） */
   var keptLinkDays = false;
+  /** fr6 以前的連結／草稿（無 dayRule＝'h24'，天數是日曆日算頭算尾）：沿用原報價天數，避免開舊連結時保費默默改變；
+   *  使用者改出發／回程日期或時間、或覆寫天數後，才改依 24 小時制重算 */
+  var legacyDays = null;
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function esc(s) { return TQ.esc(s); }
@@ -276,16 +279,20 @@
   function propOn(p) { return !!(p && p.property && p.property.enabled !== false); }
   /* ---------- 國內地點（台灣／金門／馬祖／澎湖…）→ 警告＋擋報價 ---------- */
   function isDomesticDest() { return !!TQ.detectDomestic(Q && Q.destination); }
-  /* ---------- 天數：只依出發／回程日自動計算（算頭算尾），無手填欄位 ---------- */
+  /* ---------- 天數（fr6）：依出發／回程「日期＋時間」每滿 24 小時算一天，未滿以一天計（同富邦系統）；人壽、產險共用 ----------
+   * 例：11/10 10:00～11/15 10:00＝5 天；～11/15 10:01＝6 天。時間未填視為同一時刻（＝日期相減）；同日來回＝1 天。 */
   function dateState() {
     var s = TQ.parseDateParts(Q.startDate), e = TQ.parseDateParts(Q.endDate);
     if (s && e) {
-      var d = TQ.daysInclusive(Q.startDate, Q.endDate);
-      if (!d) return { days: null, error: '⚠ 回程日早於出發日，請確認日期' };
-      // 選填覆寫：依保單起訖時刻計算（例：11/20 20:00～12/05 20:00＝15天，算頭算尾會是16天）
+      var r = TQ.quotePeriodDays(Q);
+      if (r.error) return { days: null, error: r.error };
+      var base = { h24Days: r.days, minutes: r.minutes, timesMissing: r.timesMissing, startTime: r.startTime, endTime: r.endTime };
+      // 選填覆寫：公司系統試算天數不同時手動指定
       var ov = TQ.num(Q.daysOverride);
-      if (ov > 0 && Math.floor(ov) === ov) return { days: ov, override: true, calendarDays: d };
-      return { days: d };
+      if (ov > 0 && Math.floor(ov) === ov) return Object.assign(base, { days: ov, override: true });
+      // 舊版連結／草稿：沿用原報價天數（不默默改價），直到使用者改日期／時間
+      if (legacyDays != null && legacyDays !== r.days) return Object.assign(base, { days: legacyDays, legacy: true });
+      return Object.assign(base, { days: r.days });
     }
     if (keptLinkDays && !s && !e && TQ.num(Q.days) > 0) return { days: Number(Q.days), kept: true, missing: true };
     return { days: null, missing: true };
@@ -298,21 +305,37 @@
       Q.days = nd;
       skipAutoOnce.life = {}; skipAutoOnce.prop = {};
     }
+    // 天數規則標記：沿用舊天數期間不標記（重新載入草稿仍沿用）；其餘一律為 24 小時制
+    if (st.legacy || st.kept) delete Q.dayRule; else Q.dayRule = TQ.DAY_RULE;
     return st;
+  }
+  /** 「11/10 10:00～11/15 10:00」（時間未填只顯示日期） */
+  function periodShort() {
+    return TQ.fmtDateTime(Q.startDate, Q.startTime, 'short') + '～' + TQ.fmtDateTime(Q.endDate, Q.endTime, 'short');
   }
   function updateDaysDisplay(st) {
     st = st || dateState();
-    var v = document.getElementById('daysAutoVal'), w = document.getElementById('dateWarn');
-    var txt = '', warn = '', soft = false;
+    var v = document.getElementById('daysAutoVal'), sub = document.getElementById('daysAutoSub'), w = document.getElementById('dateWarn');
+    var txt = '', subTxt = '', warn = '', soft = false;
     if (st.error) warn = st.error;
     else if (st.days) {
-      txt = '共 ' + st.days + ' 天' + (st.kept ? '（沿用原報價天數；請補填出發／回程日）'
-        : st.override ? '（手動覆寫；日期算頭算尾為 ' + st.calendarDays + ' 天）' : '（算頭算尾）');
+      txt = st.kept ? '共 ' + st.days + ' 天' : '保險期間共 ' + st.days + ' 天（' + periodShort() + '）';
+      if (st.kept) subTxt = '沿用原報價天數；請補填出發／回程日期與時間';
+      else if (st.override) subTxt = '手動覆寫天數；依起訖時間每 24 小時計為 ' + st.h24Days + ' 天';
+      else if (st.legacy) subTxt = '沿用原報價天數（舊版連結以日曆日算頭算尾）；依 24 小時制應為 ' + st.h24Days + ' 天，修改日期或時間即改依 24 小時重算';
+      else if (st.timesMissing === 'both') subTxt = '尚未填時間：視為出發、回程同一時刻（天數＝日期相減），可能少算一天';
+      else if (st.timesMissing === 'start') subTxt = '出發時間未填：暫以回程時間 ' + st.endTime + ' 計算';
+      else if (st.timesMissing === 'end') subTxt = '回程時間未填：暫以出發時間 ' + st.startTime + ' 計算';
+      else {
+        var dd = Math.floor(st.minutes / 1440), hh = Math.floor((st.minutes % 1440) / 60), mm = st.minutes % 60;
+        subTxt = '每滿 24 小時算一天，未滿以一天計（起訖相差 ' + (dd ? dd + ' 天 ' : '') + hh + ' 小時' + (mm ? ' ' + mm + ' 分' : '') + '）';
+      }
       if (st.days > 30) { soft = true; warn = '⚠ 目前 ' + st.days + ' 天：人壽（亞洲14國）可自動算到 180 天；產險 DM 費率僅 2～10 天、未滿15歲人壽僅 1～30 天，其餘請以 GPTA／產險試算後手填'; }
     }
     if (v) v.textContent = txt;
+    if (sub) { sub.textContent = subTxt; sub.classList.toggle('warn', !!(st.legacy || st.timesMissing)); }
     if (w) { w.hidden = !warn; w.textContent = warn; w.classList.toggle('soft', soft); }
-    ['startDate', 'endDate'].forEach(function (k) {
+    ['startDate', 'endDate', 'startTime', 'endTime'].forEach(function (k) {
       var el = form.querySelector('[data-k="' + k + '"]');
       if (el) el.classList.toggle('is-domestic', !!st.error);
     });
@@ -324,7 +347,7 @@
     if (isDomesticDest()) out.push(TQ.DOMESTIC_WARNING);
     var ds = dateState();
     if (ds.error) out.push(ds.error);
-    else if (ds.missing) out.push('⚠ 請填寫出發日與回程日（天數依日期自動計算）');
+    else if (ds.missing) out.push('⚠ 請填寫出發日與回程日（天數依起訖日期＋時間每 24 小時自動計算）');
     var ai = TQ.ageInfo(Q && Q.age);
     if (!ai.valid) { out.push('⚠ ' + ai.error); return out; }
     Q.plans.forEach(function (p, i) {
@@ -842,7 +865,7 @@
         if (abSel) abSel.value = aiR.band;
       }
     }
-    if (k === 'age' || k === 'startDate' || k === 'endDate' || k === 'daysOverride' || k === 'ageBand' || k === 'lifeRegion' || k === 'lifeRateType' || k === 'destination' || k === 'schengen') {
+    if (k === 'age' || k === 'startDate' || k === 'endDate' || k === 'startTime' || k === 'endTime' || k === 'daysOverride' || k === 'ageBand' || k === 'lifeRegion' || k === 'lifeRateType' || k === 'destination' || k === 'schengen') {
       skipAutoOnce.life = {}; skipAutoOnce.prop = {};
     }
     if (k === 'schengen') {
@@ -865,8 +888,9 @@
       }
     }
 
-    if (k === 'startDate' || k === 'endDate' || k === 'daysOverride') {
+    if (k === 'startDate' || k === 'endDate' || k === 'startTime' || k === 'endTime' || k === 'daysOverride') {
       keptLinkDays = false; // 已開始填日期 → 天數一律依日期
+      legacyDays = null;    // 改了日期／時間／覆寫 → 改依 24 小時制
       syncDaysFromDates();
     }
     if (k === 'destination' && isDomesticDest()) {
@@ -901,7 +925,7 @@
   }
 
   function refreshDerived() {
-    // 起迄日 → 天數（算頭算尾）；必須在保費查表前更新
+    // 起訖日時 → 天數（每滿 24 小時一天）；必須在保費查表前更新
     var dsNow = syncDaysFromDates();
     updateDaysDisplay(dsNow);
     syncPlanNames();
@@ -972,6 +996,9 @@
     var aiC = TQ.ageInfo(Q.age);
     if (aiC.valid && aiC.child) add('ok', '未滿15足歲：人壽為兒童傷害醫療旅平險 MRC 60萬＋OH1＋OAA（無 AT1／MR）；產險為兒童方案。');
     var dsC = dateState();
+    if (dsC.legacy) add('warn', '此報價為舊版連結／草稿：沿用原報價 ' + dsC.days + ' 天（舊版以日曆日算頭算尾）；依富邦系統每 24 小時計應為 ' + dsC.h24Days + ' 天。請補填出發／回程時間或改日期以重新計算。');
+    else if (dsC.days && !dsC.kept && !dsC.override && dsC.timesMissing === 'both') add('warn', '尚未填出發／回程時間：目前視為同一時刻（' + dsC.days + ' 天＝日期相減）。富邦系統每滿 24 小時算一天，請填班機起飛時間與回到台灣的時間，以免少算一天。');
+    else if (dsC.days && !dsC.kept && !dsC.override && !dsC.timesMissing) add('ok', '保險期間共 ' + dsC.days + ' 天（' + periodShort() + '；每滿 24 小時算一天，未滿以一天計，同富邦系統）。');
     if (dsC.days > 180 && Q.plans.some(function (p) { return p.life && p.life.enabled; })) add('err', '共 ' + dsC.days + ' 天：Go安行國外旅遊最高投保天數為 180 天（DM 第2頁）。');
     var riC = TQ.regionInfo(Q.destination);
     if (riC.ambiguous.length) add('warn', '目的地含「' + riC.ambiguous.join('、') + '」：DM 未明列是否屬「美國、加拿大」或「歐洲」，人壽 OH1 地區限額預設 100%；如確認適用請到「行程進階」手動調整。');
@@ -1032,8 +1059,10 @@
 
   function load(q) {
     Q = normalize(clone(q));
-    // 舊連結／草稿：有天數但無出發回程日 → 沿用其天數；有日期則一律依日期重算
+    // 舊連結／草稿：有天數但無出發回程日 → 沿用其天數
     keptLinkDays = !!(q && TQ.num(q.days) > 0 && !TQ.parseDateParts(q.startDate) && !TQ.parseDateParts(q.endDate));
+    // fr6 以前（無 dayRule）且有天數 → 沿用原天數（舊版算頭算尾），不默默改價；與 24 小時制結果相同時自然改用新制
+    legacyDays = (q && q.dayRule !== TQ.DAY_RULE && TQ.num(q.days) > 0 && Math.floor(TQ.num(q.days)) === TQ.num(q.days)) ? Number(q.days) : null;
     activePlan = 0;
     skipAutoOnce = { life: {}, prop: {} };
     schengenManual = false;

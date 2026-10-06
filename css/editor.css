@@ -35,7 +35,7 @@
 .g3 { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 label { display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; color: var(--muted); font-weight: 600; }
 label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--ink); font-size: 15px; }
-input[type=text], input[type=tel], input[type=number], input[type=date], select, textarea {
+input[type=text], input[type=tel], input[type=number], input[type=date], input[type=time], select, textarea {
   font: inherit; font-size: 16px; color: var(--ink); padding: 8px 10px; border: 1px solid #cfe3e6; border-radius: 9px; background: #fff; width: 100%;
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--gold); border-color: var(--gold); }
@@ -125,7 +125,12 @@ input.is-domestic { border-color: #c62828 !important; box-shadow: 0 0 0 2px rgba
 .age-note { display: block; margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: #e3eef6; color: #0a6d8f; font-size: 12.5px; }
 
 /* 天數：依日期自動（唯讀文字，無輸入框） */
-.date-row { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr minmax(120px, .8fr); gap: 10px 12px; align-items: end; }
+.date-row { grid-column: 1 / -1; display: grid; grid-template-columns: 1.25fr 1fr 1.25fr 1fr; gap: 10px 12px; align-items: end; }
+.date-row .days-auto { grid-column: 1 / -1; min-height: 0; padding: 8px 12px; background: #eef7fb; border: 1px solid #bfe0ec; border-radius: 10px; }
+.days-auto-sub { display: block; font-size: 12.5px; color: #33607a; margin-top: 2px; }
+.days-auto-sub:empty { display: none; }
+.period-hint { grid-column: 1 / -1; margin: 0; font-size: 12.5px; line-height: 1.55; color: #5a6b7d; }
+.period-hint b { color: #0a4d6d; }
 .date-row .dest-warn { grid-column: 1 / -1; margin-top: 0; }
 .days-auto { display: flex; flex-direction: column; justify-content: flex-end; min-height: 42px; padding-bottom: 6px; }
 .days-auto-lbl { font-size: 12px; color: var(--muted); }
@@ -314,3 +319,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--teal); bord
 .agent-status.err { background: #fdecea; color: var(--danger, #c0392b); }
 .agent-status.warn { background: #fff4e0; color: #9a5b00; }
 .agent-status.ok { background: #eaf6ee; color: #2a6b3f; }
+
+/* fr6：保險期間（日期＋時間、每滿 24 小時一天） */
+.days-auto-sub.warn { color: #9a5b00; font-weight: 700; }
+#form input[type="time"] { min-width: 0; }

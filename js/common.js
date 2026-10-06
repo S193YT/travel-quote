@@ -388,6 +388,65 @@
     return Math.floor((t2 - t1) / 86400000) + 1;
   }
 
+  /* ---------- 保險期間（fr6）：依起訖「日時」每滿 24 小時算一天，未滿 24 小時以一天計 ----------
+   * 同富邦產險 B2B／富邦人壽系統：115/11/10 10:00～115/11/15 10:00＝5 天；～11/15 10:01＝6 天。
+   * 時間未填：視為出發、回程同一時刻（只填一邊 → 另一邊比照同一時刻）→ 天數＝日期相減（不再算頭算尾）。
+   * 同一天來回＝1 天（最少 1 天）。
+   */
+  var DAY_RULE = 'h24';
+  function parseTime(s) {
+    var m = /^\s*(\d{1,2}):(\d{2})/.exec(String(s == null ? '' : s));
+    if (!m) return null;
+    var h = Number(m[1]), mi = Number(m[2]);
+    if (h > 23 || mi > 59) return null;
+    return h * 60 + mi;
+  }
+  function hhmm(t) {
+    if (t == null) return '';
+    var h = Math.floor(t / 60), mi = t % 60;
+    return (h < 10 ? '0' : '') + h + ':' + (mi < 10 ? '0' : '') + mi;
+  }
+  function fmtTime(s) { return hhmm(parseTime(s)); }
+  /** 回傳 { days, error, minutes, timesMissing: 'both'|'start'|'end'|'', startTime, endTime（實際採用） } */
+  function periodDays(startDate, startTime, endDate, endTime) {
+    var p1 = parseDateParts(startDate), p2 = parseDateParts(endDate);
+    if (!p1 || !p2) return { days: null, missing: true };
+    var t1 = parseTime(startTime), t2 = parseTime(endTime);
+    var miss = (t1 == null && t2 == null) ? 'both' : (t1 == null ? 'start' : (t2 == null ? 'end' : ''));
+    if (t1 == null && t2 == null) { t1 = 0; t2 = 0; }
+    else if (t1 == null) t1 = t2;
+    else if (t2 == null) t2 = t1;
+    var a = Date.UTC(p1.y, p1.m - 1, p1.d) + t1 * 60000;
+    var b = Date.UTC(p2.y, p2.m - 1, p2.d) + t2 * 60000;
+    if (b < a) {
+      var sameDay = Date.UTC(p1.y, p1.m - 1, p1.d) === Date.UTC(p2.y, p2.m - 1, p2.d);
+      return { days: null, error: sameDay ? '⚠ 回程時間早於出發時間，請確認時間' : '⚠ 回程日早於出發日，請確認日期', timesMissing: miss };
+    }
+    var mins = Math.round((b - a) / 60000);
+    var days = Math.max(1, Math.ceil(mins / 1440));
+    return { days: days, minutes: mins, timesMissing: miss, startTime: hhmm(t1), endTime: hhmm(t2) };
+  }
+  function quotePeriodDays(q) {
+    q = q || {};
+    return periodDays(q.startDate, q.startTime, q.endDate, q.endTime);
+  }
+  /** 日期＋時間（時間未填只顯示日期）；short＝11/10 10:00 */
+  function fmtDateTime(d, t, mode) {
+    var tt = fmtTime(t);
+    if (mode === 'short') {
+      var p = parseDateParts(d);
+      if (!p) return d || '';
+      return p.m + '/' + p.d + (tt ? ' ' + tt : '');
+    }
+    return fmtDate(d, mode) + tt;
+  }
+  /** 客戶頁／總表圖：保險期間文字（起訖日時） */
+  function periodText(quote) {
+    var mode = quote.dateFormat === 'ad' ? 'ad' : 'roc';
+    if (!quote.startDate && !quote.endDate) return '';
+    return fmtDateTime(quote.startDate, quote.startTime, mode) + ' ～ ' + fmtDateTime(quote.endDate, quote.endTime, mode);
+  }
+
   /* ---------- 分享連結編解碼（JSON → deflate → base64url，放在 #q=） ---------- */
   function b64urlFromBytes(bytes) {
     var bin = '';
@@ -828,6 +887,9 @@
     if (anyProp) prodBits.push('產險＝' + PROPERTY_PRODUCT +
       (quote.schengen ? '【計畫二・醫療加值／申根適用，海外突發疾病住院 150萬】' : '【計畫一・國外旅遊適用】'));
     if (prodBits.length) notes.push(prodBits.join('；') + '。');
+    if (quote.dayRule === DAY_RULE && quote.startDate && quote.endDate) {
+      notes.push('保險期間依出發／回程日期與時間計算：每滿 24 小時為一天，未滿 24 小時以一天計（本報價共 ' + (quote.days || '—') + ' 天）；實際以保險單所載日時為準。');
+    }
     if (quote.schengen) {
       notes.push('申根行程：' + (anyProp ? '產險已套用計畫二；' : '') + '請隨身攜帶申根地區醫療旅遊保險英文投保憑證。' +
         (anyLife ? '人壽為國外其他地區（OAA 不適用），保費請以 GPTA 試算為準。' : ''));
@@ -859,17 +921,22 @@
     return '<ul class="notes">' + notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>';
   }
 
-  function renderHeader(quote) {
+  /** 保險期間 HTML（起訖各自不換行）；cls＝外層 span class */
+  function periodHtml(quote, cls) {
     var mode = quote.dateFormat === 'ad' ? 'ad' : 'roc';
-    var dates = '';
-    if (quote.startDate || quote.endDate) dates = fmtDate(quote.startDate, mode) + ' ～ ' + fmtDate(quote.endDate, mode);
+    if (!quote.startDate && !quote.endDate) return '';
+    return '<span class="' + cls + '">📅 <small class="pd-lbl">保險期間</small> <em class="pd-t">' + esc(fmtDateTime(quote.startDate, quote.startTime, mode)) +
+      '</em> ～ <em class="pd-t">' + esc(fmtDateTime(quote.endDate, quote.endTime, mode)) + '</em></span>';
+  }
+  function renderHeader(quote) {
+    var dates = periodHtml(quote, 'hero-dates');
     var a = agentParts(agentOf(quote));
     var dest = quote.destination || '—';
     return '<div class="hero-tags"><span class="hero-tag">' + esc(heroTagText(quote)) + '</span>' + heroBadgesHtml(quote) + '</div>' +
       '<h1 class="hero-title"><span class="dest">' + esc(dest) + '</span><span class="ttl">旅遊保障方案</span></h1>' +
       '<div class="hero-sub">旅平險組合方案試算　<span class="nw"><b>' + esc(a.line) + '</b> 為您規劃</span></div>' +
       '<div class="hero-trip"><span>✈ ' + esc(dest) + '</span>' +
-      (dates ? '<span class="hero-dates">📅 ' + esc(dates) + '</span>' : '') +
+      dates +
       '<span class="days">共 <b>' + esc(quote.days || '—') + '</b> 天</span></div>';
   }
 
@@ -1165,6 +1232,7 @@
     transportLine: transportLine, regionChipText: regionChipText, lifeExtraItems: lifeExtraItems,
     textHasKeyword: textHasKeyword, computePlan: computePlan,
     fmtDate: fmtDate, daysInclusive: daysInclusive, parseDateParts: parseDateParts,
+    periodHtml: periodHtml, DAY_RULE: DAY_RULE, parseTime: parseTime, fmtTime: fmtTime, periodDays: periodDays, quotePeriodDays: quotePeriodDays, fmtDateTime: fmtDateTime, periodText: periodText,
     encodeQuote: encodeQuote, decodeHash: decodeHash, shareUrl: shareUrl,
     findPropertyPreset: findPropertyPreset, resolvePropertyPreset: resolvePropertyPreset, lookupPropertyPremium: lookupPropertyPremium,
     detectSchengen: detectSchengen,

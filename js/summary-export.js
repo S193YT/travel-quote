@@ -5,10 +5,7 @@
   function buildSummaryHtml(quote) {
     quote = TQ.resolvePlanNames(quote);
     var mode = quote.dateFormat === 'ad' ? 'ad' : 'roc';
-    var dates = '';
-    if (quote.startDate || quote.endDate) {
-      dates = TQ.fmtDate(quote.startDate, mode) + ' ～ ' + TQ.fmtDate(quote.endDate, mode);
-    }
+    var dates = TQ.periodHtml(quote, 'sum-dates');
     var a = TQ.agentOf(quote), ap = TQ.agentParts(a);
     var dest = quote.destination || '—';
     var h = '';
@@ -19,7 +16,7 @@
     h += '<div class="sum-tags"><span class="sum-tag-pill">' + TQ.esc(TQ.heroTagText(quote)) + '</span>' + TQ.heroBadgesHtml(quote, 'sum-hbadge') + '</div>';
     h += '<div class="sum-title">' + TQ.esc(dest) + '<span class="ttl">旅遊保障方案</span></div>';
     h += '<div class="sum-sub">旅平險組合方案試算　<b>' + TQ.esc(ap.line) + '</b> 為您規劃</div>';
-    h += '<div class="sum-trip"><span>✈ ' + TQ.esc(dest) + '</span>' + (dates ? '<span>📅 ' + TQ.esc(dates) + '</span>' : '') +
+    h += '<div class="sum-trip"><span>✈ ' + TQ.esc(dest) + '</span>' + dates +
       '<span>共 <b>' + TQ.esc(quote.days || '—') + '</b> 天</span></div>';
     h += '</header>';
     // 方案卡（同 DM：色塊標頭＋徽章＋大字保費＋重點保障）
