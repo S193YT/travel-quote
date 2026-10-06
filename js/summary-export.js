@@ -1,0 +1,144 @@
+/* 三方案總表報價圖：在編輯器產生可下載 PNG（適合 LINE） */
+(function (global) {
+  'use strict';
+
+  function buildSummaryHtml(quote) {
+    var mode = quote.dateFormat === 'ad' ? 'ad' : 'roc';
+    var dates = '';
+    if (quote.startDate || quote.endDate) {
+      dates = TQ.fmtDate(quote.startDate, mode) + ' ～ ' + TQ.fmtDate(quote.endDate, mode);
+    }
+    var a = TQ.agentOf(quote);
+    var h = '';
+    h += '<div class="sum-root" id="summaryCapture">';
+    if (quote.sample) h += '<div class="sum-sample">⚠ 範例資料・非正式報價</div>';
+    h += '<header class="sum-hero">';
+    h += TQ.renderBrand('sum-brand');
+    var pctS = TQ.num(quote.lifeRegionPct || 100);
+    var anyLifeS = (quote.plans || []).some(function (p) { return p.life && p.life.enabled; });
+    h += '<div class="sum-kicker">旅平險 三方案總表' + (quote.schengen ? '　<span class="hero-schengen">申根／計畫二</span>' : '') +
+      (anyLifeS && pctS !== 100 ? ' <span class="hero-schengen">人壽醫療限額 ' + pctS + '%</span>' : '') + '</div>';
+    h += '<div class="sum-title"><span class="dest">' + TQ.esc(quote.destination || '—') + '</span>';
+    h += '<span class="days">' + TQ.esc(quote.days || '—') + '<small> 天</small></span></div>';
+    if (dates) h += '<div class="sum-dates">' + TQ.esc(dates) + '</div>';
+    h += '</header>';
+    h += '<div class="sum-plans">';
+    (quote.plans || []).forEach(function (plan, idx) {
+      var c = TQ.computePlan(plan, quote);
+      var L = c.life, P = c.prop, on = L.enabled, pon = P.enabled;
+      function br(lifeTxt, propTxt) { return TQ.bracket(on, lifeTxt, propTxt, pon); }
+      h += '<section class="sum-card' + (plan.recommended ? ' reco' : '') + '">';
+      h += '<div class="sum-card-h"><span class="sum-name">' + TQ.esc(plan.name || ('方案' + (idx + 1))) + '</span>';
+      if (plan.recommended) h += '<span class="sum-badge">推薦</span>';
+      h += '</div>';
+      h += '<div class="sum-tag">' + TQ.esc(plan.tagline || '') + '</div>';
+      if (c.child) {
+        h += '<div class="sum-death"><div class="lab">' + (on ? '人壽兒童主約 MRC' : '意外身故・失能') + '</div><div class="val">' + (on ? TQ.esc(TQ.fmtYuan(L.mrc)) : '—') + '</div>';
+        h += '<div class="br">' + TQ.esc(on ? '兒童傷害醫療旅平險（未滿15足歲無 AT1）' : (pon ? '未滿15足歲：產險兒童方案無身故・失能' : '')) + '</div></div>';
+      } else {
+        h += '<div class="sum-death"><div class="lab">意外身故・失能</div><div class="val">' + TQ.esc(TQ.fmtYuan(c.death)) + '</div>';
+        h += '<div class="br">' + TQ.esc(TQ.deathSplit(L, P)) + '</div>';
+        var tr = TQ.transportLine(c);
+        if (tr) h += '<div class="sum-transport">🚌🚲🚗 大眾運輸・自行車・汽車意外身故 <b>' + TQ.esc(tr.total) + '</b><small>' + TQ.esc(tr.br) + '</small></div>';
+        h += '</div>';
+      }
+      h += '<ul class="sum-cov">';
+      function covLi(label, total, br) {
+        return '<li><span>' + TQ.esc(label) + '</span><span class="sum-amtcol"><b>' + TQ.esc(total) + '</b><small class="sum-br">' + TQ.esc(br) + '</small></span></li>';
+      }
+      h += covLi('海外突發 住院', TQ.fmtYuan(c.hospital), br((L.child ? 'OH1 ' : '') + TQ.fmtShort(L.hospital), TQ.fmtShort(P.hospital)));
+      h += covLi('海外突發 門診', TQ.fmtYuan(c.outpatient), br('每日最高 ' + TQ.fmtShort(L.outpatient), TQ.fmtShort(P.outpatient)));
+      h += covLi('海外突發 急診', TQ.fmtYuan(c.er), br('每日最高 ' + TQ.fmtShort(L.er), TQ.fmtShort(P.er)));
+      h += covLi('意外醫療', TQ.fmtYuan(c.accidentMedical), br(L.child ? 'MRC ' + TQ.fmtShort(L.mrc) : TQ.fmtShort(L.mr), TQ.fmtShort(P.accidentMedical)));
+      h += '</ul>';
+      if (on && L.regionPct !== 100) {
+        h += '<div class="sum-region">🌏 人壽「' + TQ.esc(TQ.regionLabel(L.regionPct)) + '」地區醫療限額 ' + L.regionPct + '%（OH1 ' + TQ.esc(TQ.fmtShort(L.oh1)) + ' × ' + L.regionPct + '%）</div>';
+      }
+      // 不便險精簡：前 4 項 + 其餘數
+      var items = pon ? (plan.inconvenience || []).slice(0, 4) : [];
+      if (!pon) {
+        h += '<div class="sum-sec">不便險</div><ul class="sum-items"><li class="more">不含（純人壽方案）</li></ul>';
+      } else if (items.length) {
+        h += '<div class="sum-sec">不便險</div><ul class="sum-items">';
+        items.forEach(function (it) {
+          h += '<li><span>' + TQ.esc(it.name) + '</span><span>' + TQ.esc(it.amount) + '</span></li>';
+        });
+        var more = (plan.inconvenience || []).length - items.length;
+        if (more > 0) h += '<li class="more">…另有 ' + more + ' 項不便險／詳見完整報價</li>';
+        h += '</ul>';
+      }
+      var miss = c.lifeOverCap ? 'AT1 超過年齡上限' : '需另行試算';
+      if (c.lifePremiumMissing) {
+        h += '<div class="sum-prem">壽 ' + miss + (pon ? ' ＋ 產 ' + TQ.comma(P.premium) + '（人壽另計）' : '') + '</div>';
+      } else if (on && pon) {
+        h += '<div class="sum-prem">壽 ' + TQ.comma(L.premium) + ' ＋ 產 ' + TQ.comma(P.premium) + ' ＝ <b>' + TQ.comma(c.premium) + '</b> 元</div>';
+      } else {
+        h += '<div class="sum-prem">' + (on ? '純人壽' : '純產險') + ' ＝ <b>' + TQ.comma(c.premium) + '</b> 元</div>';
+      }
+      h += '</section>';
+    });
+    h += '</div>';
+    h += '<footer class="sum-foot">';
+    h += '<div class="sum-foot-row"><img class="sum-foot-logo" src="' + TQ.BRAND.logo + '" alt="" width="52" height="52"><div>';
+    h += '<div class="u">您的專屬保險顧問・富邦人壽 ' + TQ.esc(a.unit) + '</div>';
+    h += '<div class="p"><b>' + TQ.esc(a.name) + '</b> ' + TQ.esc(a.title) + (a.phone ? '　<span class="ph">☎ ' + TQ.esc(a.phone) + '</span>' : '') + '</div>';
+    h += '</div></div>';
+    h += '<div class="note">實際以保單條款及核保為準</div>';
+    h += '</footer></div>';
+    return h;
+  }
+
+  function ensureHost() {
+    var host = document.getElementById('summaryExportHost');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'summaryExportHost';
+      host.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(host);
+    }
+    return host;
+  }
+
+  function downloadSummaryPng(quote) {
+    if (!global.html2canvas) {
+      alert('缺少 html2canvas，無法產生圖片');
+      return Promise.reject(new Error('no html2canvas'));
+    }
+    var host = ensureHost();
+    host.innerHTML = buildSummaryHtml(quote);
+    var el = host.querySelector('#summaryCapture');
+    // 等 logo（及所有圖片）載入完成再截圖，避免第一次下載 logo 空白
+    var imgs = Array.prototype.slice.call(el.querySelectorAll('img'));
+    var ready = Promise.all([TQ.brandLogoReady ? TQ.brandLogoReady() : Promise.resolve()].concat(imgs.map(function (img) {
+      if (img.complete && img.naturalWidth) return img.decode ? img.decode().catch(function () {}) : Promise.resolve();
+      return new Promise(function (res) { img.onload = img.onerror = function () { res(); }; });
+    })));
+    return ready.then(function () { return global.html2canvas(el, {
+      scale: 2,
+      backgroundColor: '#f4f6f9',
+      useCORS: true,
+      logging: false,
+      width: el.scrollWidth,
+      height: el.scrollHeight
+    }); }).then(function (canvas) {
+      return new Promise(function (resolve) {
+        canvas.toBlob(function (blob) {
+          var name = (quote.sample ? '範例_' : '') + (quote.destination || '旅平險') +
+            (quote.days || '') + '天_三方案總表.png';
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = name;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+          host.innerHTML = '';
+          resolve(name);
+        }, 'image/png');
+      });
+    }).catch(function (err) {
+      host.innerHTML = '';
+      throw err;
+    });
+  }
+
+  global.TQ_SUMMARY = { downloadSummaryPng: downloadSummaryPng, buildSummaryHtml: buildSummaryHtml };
+})(window);

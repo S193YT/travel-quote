@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>旅平險組合方案試算報價系統｜昶勝軍</title>
+<link rel="icon" type="image/png" href="img/favicon.png?v=20261006yt1">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=20261006yt1">
+<link rel="stylesheet" href="css/style.css?v=20261006yt1">
+<link rel="stylesheet" href="css/editor.css?v=20261006yt1">
+</head>
+<body class="editor-body">
+<header class="ed-top">
+  <div class="ed-brand"><img class="ed-logo" src="img/logo.png?v=20261006yt1" alt="昶勝軍" width="42" height="42"><span class="ed-brand-text"><span class="ed-slogan">富邦人壽 高秉通訊處・昶勝軍</span><span class="ed-title"><b>旅平險組合方案試算報價系統</b><span class="ed-internal">內部使用・請勿傳給客戶</span></span></span></div>
+  <div class="ed-actions">
+    <button type="button" class="btn btn-gold" id="btnSummaryPng">🖼 下載三方案總表圖</button>
+    <button type="button" class="btn" id="btnCopyLink" title="把客戶頁網址（報價資料全在網址內）複製下來貼到 LINE">🔗 複製客戶頁連結</button>
+    <button type="button" class="btn" id="btnOpenClient">👁 開啟客戶頁</button>
+    <button type="button" class="btn" id="btnSample">載入範例</button>
+    <button type="button" class="btn btn-ghost" id="btnClear">清空金額</button>
+  </div>
+</header>
+
+
+<div class="ed-layout">
+  <form class="ed-form" id="form" autocomplete="off" onsubmit="return false">
+    <section class="ed-card">
+      <h2>行程資料 <small>（頁首只顯示：目的地、天數、日期；不顯示年齡）</small></h2>
+      <div class="grid g2">
+        <label>目的地<input type="text" data-k="destination" placeholder="例：日本／法國（申根）" aria-describedby="destWarn"><span class="dest-warn" id="destWarn" role="alert" hidden></span></label>
+        <label>被保險人年齡（足歲・必填）<input type="number" min="0" max="100" step="1" data-k="age" inputmode="numeric" placeholder="例：35（不會顯示在客戶頁）" aria-describedby="ageWarn ageHint"><span class="dest-warn" id="ageWarn" role="alert" hidden></span><span class="hint" id="ageHint"></span></label>
+        <div class="date-row">
+          <label>出發日<input type="date" data-k="startDate"></label>
+          <label>回程日<input type="date" data-k="endDate"></label>
+          <div class="days-auto" id="daysAuto" aria-live="polite"><span class="days-auto-lbl">天數（依日期自動）</span><span class="days-auto-val" id="daysAutoVal"></span></div>
+          <span class="dest-warn" id="dateWarn" role="alert" hidden></span>
+        </div>
+        <label>日期顯示
+          <select data-k="dateFormat"><option value="roc">民國（115/10/13）</option><option value="ad">西元（2026/10/13）</option></select>
+        </label>
+      </div>
+      <details class="prop-advanced" style="margin-top:10px">
+        <summary>行程進階（OH1 地區%、人壽查表地區、投保天數覆寫、年齡帶）</summary>
+        <div class="grid g2" style="margin-top:8px">
+          <label>人壽 OH1 地區限額調整
+            <select data-k="lifeRegionPct"></select>
+            <span class="hint" id="regionHint"></span>
+          </label>
+          <label>人壽費率類型
+            <select data-k="lifeRateType">
+              <option value="agency">旅行社／快易保費率</option>
+            </select>
+          </label>
+          <label>人壽旅遊地區（查表用）
+            <select data-k="lifeRegion">
+              <option value="asia14">國外亞洲14國（可附 OAA）</option>
+              <option value="other">國外其他</option>
+            </select>
+            <span class="hint">申根勾選時會自動改為「國外其他」</span>
+          </label>
+          <label>投保天數覆寫（選填）
+            <input type="number" min="1" max="365" step="1" data-k="daysOverride" inputmode="numeric" placeholder="空白＝依日期算頭算尾">
+            <span class="hint">依保單起訖時刻計天時用（例：11/20 晚上 20:00 出發～12/05 20:00＝15 天）</span>
+          </label>
+          <label>年齡區間（依上方年齡自動・客戶頁不顯示）
+            <select data-k="ageBand" disabled>
+              <option value="18-65">18足歲～65歲</option>
+              <option value="15-17">15足歲～17歲</option>
+              <option value="66-70">66～70歲</option>
+              <option value="71-75">71～75歲</option>
+              <option value="76-80">76～80歲</option>
+              <option value="81-100">81～100歲</option>
+              <option value="under15">未滿15足歲</option>
+            </select>
+          </label>
+        </div>
+      </details>
+      <label class="schengen-toggle">
+        <input type="checkbox" data-k="schengen">
+        <span>
+          <span class="st-title">🇪🇺 申根行程（產險改用計畫二）</span>
+          <span class="st-desc">勾選後產險自動改為「新快樂旅綜+ 計畫二（醫療加值／申根適用）」：海外突發疾病住院固定 <b>150萬</b>，保額仍依下方各方案「產險保額」。人壽視為國外其他（無 OAA），離線表無費率，需 GPTA 手填。</span>
+          <span class="hint auto" id="schengenAutoHint" hidden>已依目的地自動勾選申根</span>
+        </span>
+      </label>
+      <p class="hint" id="autoPremiumBanner" style="margin:10px 0 0;padding:8px 10px;background:#eef6ff;border-radius:8px;color:#173c66"></p>
+      <label class="check sample-check"><input type="checkbox" data-k="sample"> 標示為「範例資料」（客戶頁會出現紅色「範例」標記；正式報價請取消勾選）</label>
+    </section>
+
+    <div class="plan-tabs" id="planTabs"></div>
+    <div id="planForms"></div>
+
+    <section class="ed-card">
+      <h2>附註（選填）</h2>
+      <textarea data-k="extraNotesText" rows="3" placeholder="每行一則，會加在頁尾附註"></textarea>
+      <h2 style="margin-top:14px">簽名</h2>
+      <div class="grid g2">
+        <label>通訊處<input type="text" data-k="agent.unit"></label>
+        <label>業務員<input type="text" data-k="agent.name"></label>
+        <label>職稱<input type="text" data-k="agent.title"></label>
+        <label>電話（客戶頁可直接撥打）<input type="tel" data-k="agent.phone" placeholder="0963-218-888"></label>
+      </div>
+    </section>
+
+    <section class="ed-card checks" id="checks"></section>
+  <p class="build-ver" id="buildVersion">昶勝軍版 115/10/06（費率資料同原版 115/10/06 12:15）</p>
+  </form>
+
+  <aside class="ed-preview">
+    <div class="pv-bar">
+      <span>即時預覽</span>
+      <div class="pv-toggle">
+        <button type="button" class="on" data-w="390">手機 390px</button>
+        <button type="button" data-w="full">桌機</button>
+      </div>
+    </div>
+    <div class="pv-scroll"><div class="pv-frame" id="pvFrame"><div class="app" id="preview"></div></div></div>
+  </aside>
+</div>
+
+<script src="js/vendor/pako.min.js?v=20261006yt1"></script>
+<script src="js/vendor/html2canvas.min.js?v=20261006yt1"></script>
+<script src="js/common.js?v=20261006yt1"></script>
+<script src="js/sample-data.js?v=20261006yt1"></script>
+<script src="js/presets.js?v=20261006yt1"></script>
+<script src="js/life-rates.js?v=20261006yt1"></script>
+<script src="js/summary-export.js?v=20261006yt1"></script>
+<script src="js/editor.js?v=20261006yt1"></script>
+</body>
+</html>
