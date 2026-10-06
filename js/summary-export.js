@@ -3,6 +3,7 @@
   'use strict';
 
   function buildSummaryHtml(quote) {
+    quote = TQ.resolvePlanNames(quote);
     var mode = quote.dateFormat === 'ad' ? 'ad' : 'roc';
     var dates = '';
     if (quote.startDate || quote.endDate) {

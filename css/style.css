@@ -295,3 +295,8 @@ table.cmp { width: 100%; min-width: 340px; table-layout: fixed; border-collapse:
 .pv-frame:not(.full) .plan-nav a { padding: 6px 10px; }
 .cmp tr.prem td.miss { font-size: 12.5px; white-space: normal; }
 @media (min-width: 760px) { .cmp tr.prem td.miss { font-size: 14px; } }
+
+/* fr3：三方案同類型 → 手機導覽列顯示保額檔次（桌機已含於名稱） */
+.plan-nav .nav-tier { display: none; font-size: 13px; font-weight: 700; }
+@media (max-width: 759px) { .plan-nav .nav-tier { display: inline; } }
+.pv-frame:not(.full) .plan-nav .nav-tier { display: inline; }

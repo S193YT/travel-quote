@@ -105,7 +105,7 @@
   function blankPlan(i) {
     var d = PLAN_DEFAULTS[i] || PLAN_DEFAULTS[2];
     return {
-      name: d.name, tagline: d.tagline, recommended: i === 2,
+      name: d.name, tagline: d.tagline, nameCustom: false, taglineCustom: false, recommended: i === 2,
       life: { enabled: d.life, at1Wan: d.at1, childOh1Wan: 60, oh1Wan: null, mrWan: null, oaa: true, hospitalYuan: null, outpatientYuan: null, erYuan: null, premium: null },
       property: { enabled: d.prop, planCode: '', label: '', deathWan: d.death, hospitalWan: null, outpatientYuan: null, erYuan: null, accidentMedicalWan: null, premium: null },
       inconvenience: [], others: []
@@ -158,11 +158,104 @@
         else if (!TQ.num(p.life.at1Wan)) p.life.at1Wan = 500;
       }
     });
+    // 名稱／副標：舊稿（無旗標）依樣式判斷是否自動；自動者一律依類型推導（避免「方案一 純人壽」卻只勾產險）
+    q.plans.forEach(function (p, idx) {
+      p.nameCustom = !TQ.nameIsAuto(p);
+      p.taglineCustom = !TQ.taglineIsAuto(p);
+      p.name = TQ.planName(p, idx, q);
+      p.tagline = TQ.planTagline(p);
+    });
     q._draftVersion = DRAFT_VERSION;
     return q;
   }
 
-
+  /** 自動名稱／副標依目前類型＋保額重算，並同步分頁、方案標題、輸入框（使用者正在輸入的欄位不覆寫） */
+  function syncPlanNames() {
+    Q.plans.forEach(function (p, i) {
+      if (!p.nameCustom) p.name = TQ.autoPlanName(p, i, Q);
+      if (!p.taglineCustom) p.tagline = TQ.planTagline(p);
+      var tab = planTabs.children[i];
+      if (tab && tab.textContent !== p.name) tab.textContent = p.name;
+      var sec = planForms.querySelector('[data-plan="' + i + '"]');
+      if (!sec) return;
+      var tt = sec.querySelector('.pf-title-txt');
+      if (tt && tt.textContent !== p.name) tt.textContent = p.name;
+      ['name', 'tagline'].forEach(function (f) {
+        var el = sec.querySelector('[data-k="plans.' + i + '.' + f + '"]');
+        if (el && el !== document.activeElement && el.value !== (p[f] || '')) el.value = p[f] || '';
+      });
+      var st = sec.querySelector('[data-name-state="' + i + '"]');
+      if (st) st.textContent = p.nameCustom ? '自訂名稱（清空或按「依類型自動命名」可恢復自動）' : '自動：依方案類型＋保額產生';
+    });
+    syncRecoSelect();
+  }
+  /** 推薦方案選單（無／方案一／二／三）← 各方案 recommended */
+  function syncRecoSelect() {
+    var sel = document.getElementById('recoSel');
+    if (!sel || !Q) return;
+    var on = [];
+    Q.plans.forEach(function (p, i) { if (p.recommended) on.push(i); });
+    var multi = sel.querySelector('option[value="multi"]');
+    if (on.length > 1) {
+      if (!multi) { multi = document.createElement('option'); multi.value = 'multi'; multi.disabled = true; sel.appendChild(multi); }
+      multi.textContent = '（多個：' + on.map(function (i) { return '方案' + '一二三'.charAt(i); }).join('、') + '）';
+      sel.value = 'multi';
+    } else {
+      if (multi) multi.remove();
+      sel.value = on.length ? String(on[0]) : '';
+    }
+  }
+  /** 設定方案類型（純人壽／純產險／人壽＋產險）：唯一的類型來源，名稱／副標隨之推導 */
+  function setPlanKind(i, kind) {
+    var pe = Q.plans[i];
+    if (!pe || TQ.PLAN_KINDS.indexOf(kind) < 0) return;
+    var wantL = kind !== 'prop', wantP = kind !== 'life';
+    if (wantL && !pe.life.enabled) {
+      pe.life.enabled = true;
+      if (!TQ.num(pe.life.at1Wan)) pe.life.at1Wan = 500;
+      pe.life.oaa = !Q.schengen && Q.lifeRegion === 'asia14';
+      pe.life.premium = null; pe.life._premAuto = false;
+    } else if (!wantL && pe.life.enabled) {
+      pe.life.enabled = false;
+    }
+    if (wantP !== propOn(pe)) {
+      pe.property.enabled = wantP;
+      pe.property._appliedCode = null; pe.property.planCode = '';
+      if (wantP) { pe.property.premium = null; if (!TQ.num(pe.property.deathWan)) pe.property.deathWan = Q.schengen ? 500 : 200; }
+    }
+    delete skipAutoOnce.life[i]; delete skipAutoOnce.prop[i];
+  }
+  /** 快速套用：三方案同類型 200／500／1000萬（依年齡上限／DM 可選保額調整） */
+  var QUICK_TIERS = [200, 500, 1000];
+  function applyQuickPreset(kind) {
+    var ai = TQ.ageInfo(Q.age), child = ai.valid && ai.child;
+    var cap = ai.valid && !child ? ai.at1Max : 2000;
+    var propOpts = propertyDeathOptionsFor(ai);
+    var notes = [];
+    Q.plans.forEach(function (p, i) {
+      if (i > 2) return;
+      var t = QUICK_TIERS[i];
+      setPlanKind(i, kind);
+      if (kind !== 'prop') {
+        var a = Math.max(100, Math.min(t, cap));
+        if (a !== t && !child) notes.push('方案' + '一二三'.charAt(i) + ' 人壽 ' + t + '萬超過「' + ai.label + '」AT1 上限，改為 ' + a + '萬');
+        p.life.at1Wan = a; p.life.premium = null; p.life._premAuto = false;
+      }
+      if (kind !== 'life') {
+        var d = null;
+        propOpts.forEach(function (o) { if (o <= t) d = o; });
+        if (d == null) d = propOpts[0] || t;
+        if (d !== t && !child) notes.push('方案' + '一二三'.charAt(i) + ' 產險 ' + t + '萬不符 DM 投保年齡，改為 ' + d + '萬');
+        p.property.deathWan = d; p.property.planCode = ''; p.property._appliedCode = null; p.property.premium = null;
+      }
+      p.nameCustom = false; p.taglineCustom = false;
+    });
+    if (child) notes.push('未滿15足歲：人壽為 MRC 60萬、產險為兒童方案，無 200／500／1000萬檔次，請再調整各方案');
+    activePlan = 0;
+    buildPlanUI(); update();
+    toast('已套用三方案' + TQ.PLAN_KIND_LABEL[kind] + ' 200／500／1000萬' + (notes.length ? '｜' + notes.join('；') : ''));
+    return notes;
+  }
 
   function setSchengenHint(showAuto) {
     var el = document.getElementById('schengenAutoHint');
@@ -233,7 +326,7 @@
     if (!ai.valid) { out.push('⚠ ' + ai.error); return out; }
     Q.plans.forEach(function (p, i) {
       var n = p.name || ('方案' + (i + 1));
-      if (!(p.life && p.life.enabled) && !propOn(p)) out.push('⚠ ' + n + '：人壽、產險都沒勾選，請至少勾一項');
+      if (!(p.life && p.life.enabled) && !propOn(p)) out.push('⚠ ' + n + '：請選擇方案類型（純人壽／純產險／人壽＋產險）');
       if (p.life && p.life.enabled && !ai.child && TQ.num(p.life.at1Wan) > ai.at1Max) {
         out.push('⚠ ' + n + '：人壽 AT1 ' + p.life.at1Wan + ' 萬超過「' + ai.label + '」上限 ' + ai.at1Max + ' 萬，請調降');
       }
@@ -558,18 +651,21 @@
     var ai = TQ.ageInfo(Q.age);
     var child = TQ.isChildQuote(Q);
     var h = '<section class="ed-card plan-form" data-plan="' + i + '"' + (i === activePlan ? '' : ' hidden') + '>';
-    h += '<h2>' + esc(plan.name || ('方案' + (i + 1))) +
+    h += '<h2><span class="pf-title-txt">' + esc(plan.name || ('方案' + (i + 1))) + '</span>' +
       (plan.recommended ? ' <span class="reco-badge" style="font-size:13px">推薦</span>' : '') + '</h2>';
     var hasProp = propOn(plan);
-    h += '<div class="plan-kind">' +
-      '<label class="kind-chk' + (hasLife ? ' on' : '') + '"><input type="checkbox" data-k="' + b + 'life.enabled"><span class="kind-txt"><b>含人壽</b><small>富邦人壽 Go安行（AT1＋OH1＋MR）</small></span></label>' +
-      '<label class="kind-chk' + (hasProp ? ' on' : '') + '"><input type="checkbox" data-k="' + b + 'property.enabled"><span class="kind-txt"><b>含產險</b><small>富邦產險 新快樂旅綜+</small></span></label>' +
-      '</div>';
+    var kind = TQ.planKind(plan);
+    h += '<label class="kind-sel">方案類型<select data-k="' + b + 'kind">' +
+      (kind === 'none' ? '<option value="none" disabled>⚠ 請選擇方案類型</option>' : '') +
+      '<option value="life">純人壽（富邦人壽 Go安行）</option>' +
+      '<option value="prop">純產險（富邦產險 新快樂旅綜+）</option>' +
+      '<option value="both">人壽＋產險</option>' +
+      '</select></label>';
     h += '<p class="plan-simple-hint">' + (hasLife && hasProp
       ? '壽＋產：只需填人壽保額、產險保額（其餘自動）'
       : hasLife ? '純人壽：只需填人壽保額（不含產險／不便險）'
       : hasProp ? '純產險：只需填產險保額（無人壽）'
-      : '⚠ 請至少勾選人壽或產險') +
+      : '⚠ 請選擇方案類型') +
       (Q.schengen ? '　｜已勾選申根→產險用計畫二（突發疾病 150萬）' : '') + '</p>';
 
     h += '<div class="grid g2">';
@@ -612,10 +708,12 @@
 
     h += '<details class="prop-advanced" style="margin-top:10px"><summary>進階（名稱／附約／細項／手改保費）</summary>';
     h += '<div class="grid g2" style="margin-top:8px">' +
-      field('方案名稱', b + 'name', { type: 'text' }) +
-      field('副標', b + 'tagline', { type: 'text' }) +
+      field('方案名稱', b + 'name', { type: 'text', ph: '空白＝依類型自動' }) +
+      field('副標', b + 'tagline', { type: 'text', ph: '空白＝依類型自動' }) +
       '</div>';
-    h += '<label class="check" style="margin-top:8px"><input type="checkbox" data-k="' + b + 'recommended"> 標示「推薦」</label>';
+    h += '<p class="hint name-state"><span data-name-state="' + i + '"></span> ' +
+      '<button type="button" class="btn btn-sm" data-act="autoname" data-i="' + i + '">↺ 依類型自動命名</button>' +
+      '　推薦標示請用上方「推薦方案」選單</p>';
 
     h += '<div class="sub-box life-box" style="margin-top:10px"><b>人壽細項</b>' + (hasLife ? '' : '<span class="hint">（未含人壽）</span>');
     h += '<div class="grid g3" style="margin-top:8px">' +
@@ -649,11 +747,23 @@
   }
   function buildPlanUI() {
     rebuildingUI = true;
+    Q.plans.forEach(function (p, i) {
+      if (!p.nameCustom) p.name = TQ.autoPlanName(p, i, Q);
+      if (!p.taglineCustom) p.tagline = TQ.planTagline(p);
+    });
     planTabs.innerHTML = Q.plans.map(function (p, i) {
       return '<button type="button" data-tab="' + i + '"' + (i === activePlan ? ' class="on"' : '') + '>' + esc(p.name || ('方案' + (i + 1))) + '</button>';
     }).join('');
+    // 重建時保留各方案「進階」展開狀態
+    var openDet = Array.prototype.map.call(planForms.querySelectorAll('[data-plan]'), function (sec) {
+      return Array.prototype.map.call(sec.querySelectorAll('details'), function (d) { return d.open; });
+    });
     planForms.innerHTML = Q.plans.map(function (_, i) { return planForm(i); }).join('');
+    Array.prototype.forEach.call(planForms.querySelectorAll('[data-plan]'), function (sec, si) {
+      Array.prototype.forEach.call(sec.querySelectorAll('details'), function (d, di) { if (openDet[si] && openDet[si][di]) d.open = true; });
+    });
     fillInputs(planForms);
+    syncPlanNames();
     rebuildingUI = false;
     refreshDerived();
   }
@@ -662,7 +772,9 @@
   function fillInputs(scope) {
     Array.prototype.forEach.call(scope.querySelectorAll('[data-k]'), function (el) {
       var k = el.getAttribute('data-k'), v;
+      var mK = /^plans\.(\d+)\.kind$/.exec(k);
       if (k === 'extraNotesText') v = (Q.extraNotes || []).join('\n');
+      else if (mK) v = TQ.planKind(Q.plans[Number(mK[1])]);
       else v = getPath(Q, k);
       if (el.type === 'checkbox') el.checked = !!v;
       else el.value = (v === null || v === undefined) ? '' : v;
@@ -671,6 +783,16 @@
   function readInput(el) {
     var k = el.getAttribute('data-k');
     if (k === 'extraNotesText') { Q.extraNotes = el.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean); return; }
+    var mKind = /^plans\.(\d+)\.kind$/.exec(k);
+    if (mKind) { setPlanKind(Number(mKind[1]), el.value); return; }
+    var mNm = /^plans\.(\d+)\.(name|tagline)$/.exec(k);
+    if (mNm) {
+      var pn = Q.plans[Number(mNm[1])], txt = String(el.value || '');
+      pn[mNm[2] + 'Custom'] = !!txt.trim();
+      pn[mNm[2]] = txt.trim() ? txt : (mNm[2] === 'name' ? TQ.autoPlanName(pn, Number(mNm[1]), Q) : TQ.planTagline(Object.assign({}, pn, { taglineCustom: false })));
+      syncPlanNames();
+      return;
+    }
     var v;
     if (el.type === 'checkbox') v = el.checked;
     else if (el.type === 'number' || (el.tagName === 'SELECT' && (k === 'lifeRegionPct' || el.getAttribute('data-num') === '1'))) {
@@ -773,16 +895,13 @@
         if (sel2) sel2.value = Q.lifeRegion;
       }
     }
-    if (/\.name$/.test(k) && /^plans\.\d+\.name$/.test(k)) {
-      var i = Number(k.split('.')[1]);
-      planTabs.children[i].textContent = Q.plans[i].name || ('方案' + (i + 1));
-    }
   }
 
   function refreshDerived() {
     // 起迄日 → 天數（算頭算尾）；必須在保費查表前更新
     var dsNow = syncDaysFromDates();
     updateDaysDisplay(dsNow);
+    syncPlanNames();
     var needRebuild = applyAutoPremiums();
     if (needRebuild && !rebuildingUI) {
       // 保障項目列數變了，重建表單一次（_appliedCode 已寫入，不會迴圈）
@@ -966,13 +1085,19 @@
     if (t.hasAttribute('data-k') && (t.type === 'checkbox' || t.tagName === 'SELECT')) {
       readInput(t);
       if (t.getAttribute('data-k') === 'schengen') { buildPlanUI(); return; }
-      if (/^plans\.\d+\.((life|property)\.enabled|life\.combo|life\.at1Wan)$/.test(t.getAttribute('data-k'))) { buildPlanUI(); update(); return; }
+      if (/^plans\.\d+\.(kind|(life|property)\.enabled|life\.combo|life\.at1Wan)$/.test(t.getAttribute('data-k'))) { buildPlanUI(); update(); return; }
       update();
     }
   });
   form.addEventListener('click', function (e) {
     var b = e.target.closest('[data-act]');
     if (!b) return;
+    if (b.getAttribute('data-act') === 'autoname') {
+      var pa = Q.plans[Number(b.getAttribute('data-i'))];
+      pa.nameCustom = false; pa.taglineCustom = false;
+      syncPlanNames(); update(); toast('已改回依類型自動命名：' + pa.name);
+      return;
+    }
     var i = Number(b.getAttribute('data-i')), kind = b.getAttribute('data-kind'), j = Number(b.getAttribute('data-j'));
     var arr = Q.plans[i][kind], act = b.getAttribute('data-act');
     if (act === 'add') arr.push({ name: '', amount: '' });
@@ -1056,6 +1181,20 @@
     });
     load(Q); toast('已清空金額');
   });
+
+  /* ---------- 快速套用／推薦方案 ---------- */
+  var btnQuick = document.getElementById('btnQuickApply');
+  if (btnQuick) btnQuick.addEventListener('click', function () {
+    applyQuickPreset(document.getElementById('quickKind').value);
+  });
+  var recoSel = document.getElementById('recoSel');
+  if (recoSel) recoSel.addEventListener('change', function () {
+    var v = recoSel.value;
+    if (v === 'multi') return;
+    Q.plans.forEach(function (p, i) { p.recommended = v !== '' && String(i) === v; });
+    buildPlanUI(); update();
+  });
+  window.TQ_EDITOR = { applyQuickPreset: applyQuickPreset, setPlanKind: function (i, k) { setPlanKind(i, k); buildPlanUI(); update(); }, getQuote: function () { return scrubForSave(Q); } };
 
   /* ---------- 初始化 ---------- */
   var regionSel = form.querySelector('[data-k="lifeRegionPct"]');

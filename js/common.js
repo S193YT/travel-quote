@@ -539,6 +539,70 @@
     if (m) return { no: m[1].replace(/\s+/g, ''), nm: m[2] || '' };
     return { no: '方案' + (CN_NUM.charAt(idx) || String(idx + 1)), nm: s };
   }
+  /* ---------- 方案類型（純人壽／純產險／人壽＋產險）→ 名稱／副標一律由類型推導（115/10/06 fr3） ---------- */
+  var PLAN_KINDS = ['life', 'prop', 'both'];
+  var PLAN_KIND_LABEL = { life: '純人壽', prop: '純產險', both: '人壽＋產險', none: '未選擇類型' };
+  var AUTO_TAGLINE = { life: '高身故・高醫療（富邦人壽）', prop: '含旅行不便險（富邦產險）', both: '壽＋產・保障最完整', none: '' };
+  /** 依 life.enabled／property.enabled 判斷類型（舊稿 property 無 enabled＝含產險，同 computePlan） */
+  function planKind(p) {
+    var l = !!(p && p.life && p.life.enabled);
+    var r = !!(p && (!p.property || p.property.enabled !== false));
+    return l && r ? 'both' : l ? 'life' : r ? 'prop' : 'none';
+  }
+  /** 保額檔次：純人壽＝AT1；純產險＝產險身故；壽＋產＝「各500萬」或「壽500萬／產200萬」；未滿15歲（無 AT1／產險身故）不列 */
+  function planTierText(p, quote) {
+    var k = planKind(p);
+    if (k === 'none' || (quote && isChildQuote(quote))) return '';
+    var a = num(p.life && p.life.at1Wan), d = num(p.property && p.property.deathWan);
+    if (k === 'life') return a > 0 ? a + '萬' : '';
+    if (k === 'prop') return d > 0 ? d + '萬' : '';
+    if (!(a > 0) || !(d > 0)) return '';
+    return a === d ? '各' + a + '萬' : '壽' + a + '萬／產' + d + '萬';
+  }
+  function autoPlanName(p, idx, quote) {
+    var t = planTierText(p, quote);
+    return '方案' + (CN_NUM.charAt(idx) || String(idx + 1)) + ' ' + PLAN_KIND_LABEL[planKind(p)] + (t ? ' ' + t : '');
+  }
+  /** 舊稿／舊連結（無 nameCustom）：名稱為預設樣式（方案X＋類型＋保額）→ 視為自動，依勾選重新推導（修正名稱與勾選不一致） */
+  var AUTO_NAME_RE = /^\s*(方案\s*[一二三四五六七八九十0-9]+)?[\s\u3000:：・\-]*(純人壽|純產險|人壽\s*[＋+]\s*產險|壽\s*[＋+]\s*產|未選擇類型)?\s*(各|壽)?\s*(\d+\s*萬)?\s*([／\/]\s*產?\s*\d+\s*萬)?\s*$/;
+  function nameIsAuto(p) {
+    if (!p) return true;
+    if (p.nameCustom === true) return false;
+    if (p.nameCustom === false) return true;
+    return AUTO_NAME_RE.test(String(p.name == null ? '' : p.name));
+  }
+  function taglineIsAuto(p) {
+    if (!p) return true;
+    if (p.taglineCustom === true) return false;
+    if (p.taglineCustom === false) return true;
+    if (p.tagline == null) return true;
+    var t = String(p.tagline).trim();
+    return PLAN_KINDS.some(function (k) { return AUTO_TAGLINE[k] === t; });
+  }
+  function planName(p, idx, quote) {
+    return (nameIsAuto(p) ? '' : String(p.name || '').trim()) || autoPlanName(p, idx, quote);
+  }
+  function planTagline(p) { return taglineIsAuto(p) ? AUTO_TAGLINE[planKind(p)] : String(p.tagline == null ? '' : p.tagline); }
+  /** 渲染前：名稱／副標依類型解析（不改原物件；可重複呼叫） */
+  function resolvePlanNames(quote) {
+    if (!quote || !quote.plans || quote._namesResolved) return quote;
+    var q = {};
+    Object.keys(quote).forEach(function (k) { q[k] = quote[k]; });
+    q.plans = quote.plans.map(function (p, i) {
+      var c = {};
+      Object.keys(p || {}).forEach(function (k) { c[k] = p[k]; });
+      c.name = planName(p, i, quote); c.nameCustom = !nameIsAuto(p);
+      c.tagline = planTagline(p); c.taglineCustom = !taglineIsAuto(p);
+      return c;
+    });
+    Object.defineProperty(q, '_namesResolved', { value: true, enumerable: false });
+    return q;
+  }
+  /** 各方案同類型 → 該類型；否則 null */
+  function uniformKind(quote) {
+    var ks = ((quote && quote.plans) || []).map(planKind);
+    return ks.length && ks[0] !== 'none' && ks.every(function (k) { return k === ks[0]; }) ? ks[0] : null;
+  }
   function quoteKinds(quote) {
     var plans = (quote && quote.plans) || [];
     return {
@@ -555,7 +619,8 @@
   function heroTagText(quote) {
     var n = ((quote && quote.plans) || []).length;
     var co = companiesText(quote, ' ／ ');
-    return (co ? co + '｜' : '') + (n > 0 && n <= 10 ? CN_NUM.charAt(n - 1) : n) + '方案比較';
+    var uk = n > 1 ? uniformKind(quote) : null;
+    return (co ? co + '｜' : '') + (uk ? PLAN_KIND_LABEL[uk] + ' ' : '') + (n > 0 && n <= 10 ? CN_NUM.charAt(n - 1) : n) + '方案比較';
   }
   function heroBadgesHtml(quote, cls) {
     cls = cls || 'hero-badge';
@@ -611,6 +676,7 @@
   var NA = function () { return cmpCell('—', '', true); };
   function compareData(quote, opt) {
     opt = opt || {};
+    quote = resolvePlanNames(quote);
     var plans = quote.plans || [];
     var cs = plans.map(function (p) { return computePlan(p, quote); });
     var rows = [];
@@ -699,6 +765,7 @@
   }
 
   function renderPlanCard(plan, quote, idx) {
+    if (quote && !quote._namesResolved && quote.plans && quote.plans[idx] === plan) plan = resolvePlanNames(quote).plans[idx];
     var c = computePlan(plan, quote);
     var L = c.life, P = c.prop, on = L.enabled, pon = P.enabled;
     var nm = splitPlanName(plan.name, idx);
@@ -817,13 +884,18 @@
   }
 
   function renderQuote(quote, root) {
+    quote = resolvePlanNames(quote);
     var plans = quote.plans || [];
     var html = '';
     if (quote.sample) html += '<div class="sample-banner" role="note">⚠ 範例資料・非正式報價（僅供版面示意）</div>';
     html += '<header class="hero">' + renderHeader(quote) + '</header>';
+    var ukNav = plans.length > 1 ? uniformKind(quote) : null;
     html += '<nav class="plan-nav">' + plans.map(function (p, i) {
       var nm = splitPlanName(p.name, i);
-      return '<a href="#plan-' + (i + 1) + '" data-target="plan-' + (i + 1) + '" class="pc' + (i % 3 + 1) + '">' + esc(nm.no) + (nm.nm ? '<span class="nav-nm"> ' + esc(nm.nm) + '</span>' : '') + '</a>';
+      // 三方案同類型：手機導覽列（隱藏名稱時）仍顯示保額檔次，方便客戶分辨
+      var tier = (ukNav && !p.nameCustom) ? planTierText(p, quote) : '';
+      return '<a href="#plan-' + (i + 1) + '" data-target="plan-' + (i + 1) + '" class="pc' + (i % 3 + 1) + '">' + esc(nm.no) +
+        (tier ? '<span class="nav-tier"> ' + esc(tier) + '</span>' : '') + (nm.nm ? '<span class="nav-nm"> ' + esc(nm.nm) + '</span>' : '') + '</a>';
     }).join('') + '<a href="#plan-cmp" data-target="plan-cmp" class="nav-cmp">比較</a></nav>';
     html += '<main class="plans">' + plans.map(function (p, i) { return renderPlanCard(p, quote, i); }).join('') + '</main>';
     if (plans.length) {
@@ -1102,6 +1174,9 @@
     BRAND: BRAND, renderBrand: renderBrand, DEFAULT_AGENT: DEFAULT_AGENT, agentOf: agentOf, telHref: telHref,
     bracket: bracket, deathSplit: deathSplit, brandLogoReady: function () { return brandLogoReady; },
     renderQuote: renderQuote, renderPlanCard: renderPlanCard, titleFor: titleFor, esc: esc,
+    PLAN_KINDS: PLAN_KINDS, PLAN_KIND_LABEL: PLAN_KIND_LABEL, AUTO_TAGLINE: AUTO_TAGLINE, planKind: planKind, planTierText: planTierText,
+    autoPlanName: autoPlanName, nameIsAuto: nameIsAuto, taglineIsAuto: taglineIsAuto, planName: planName, planTagline: planTagline,
+    resolvePlanNames: resolvePlanNames, uniformKind: uniformKind,
     splitPlanName: splitPlanName, priceInfo: priceInfo, priceHtml: priceHtml, compareData: compareData, compareTableHtml: compareTableHtml,
     heroTagText: heroTagText, heroBadgesHtml: heroBadgesHtml, agentParts: agentParts, disclaimerText: disclaimerText, companiesText: companiesText
   };

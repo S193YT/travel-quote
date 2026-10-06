@@ -9,14 +9,14 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>旅平險組合方案試算報價系統｜昶勝軍</title>
-<link rel="icon" type="image/png" href="img/favicon.png?v=20261006fr2">
-<link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=20261006fr2">
-<link rel="stylesheet" href="css/style.css?v=20261006fr2">
-<link rel="stylesheet" href="css/editor.css?v=20261006fr2">
+<link rel="icon" type="image/png" href="img/favicon.png?v=20261006fr3">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=20261006fr3">
+<link rel="stylesheet" href="css/style.css?v=20261006fr3">
+<link rel="stylesheet" href="css/editor.css?v=20261006fr3">
 </head>
 <body class="editor-body">
 <header class="ed-top">
-  <div class="ed-brand"><img class="ed-logo" src="img/logo.png?v=20261006fr2" alt="昶勝軍" width="42" height="42"><span class="ed-brand-text"><span class="ed-slogan">富邦人壽 高秉通訊處・昶勝軍</span><span class="ed-title"><b>旅平險組合方案試算報價系統</b><span class="ed-internal">內部使用・請勿傳給客戶</span></span></span></div>
+  <div class="ed-brand"><img class="ed-logo" src="img/logo.png?v=20261006fr3" alt="昶勝軍" width="42" height="42"><span class="ed-brand-text"><span class="ed-slogan">富邦人壽 高秉通訊處・昶勝軍</span><span class="ed-title"><b>旅平險組合方案試算報價系統</b><span class="ed-internal">內部使用・請勿傳給客戶</span></span></span></div>
   <div class="ed-actions">
     <button type="button" class="btn btn-gold" id="btnSummaryPng">🖼 下載三方案總表圖</button>
     <button type="button" class="btn" id="btnCopyLink" title="把客戶頁網址（報價資料全在網址內）複製下來貼到 LINE">🔗 複製客戶頁連結</button>
@@ -29,6 +29,29 @@
 
 <div class="ed-layout">
   <form class="ed-form" id="form" autocomplete="off" onsubmit="return false">
+    <section class="ed-card quick-card" id="quickCard">
+      <h2>方案設定 <small>（套用後各方案的類型、保額、名稱仍可在下方個別修改）</small></h2>
+      <div class="quick-row">
+        <label>快速套用：三方案同類型 200／500／1000萬
+          <select id="quickKind">
+            <option value="prop">純產險</option>
+            <option value="life">純人壽（AT1）</option>
+            <option value="both">人壽＋產險（壽、產各同檔）</option>
+          </select>
+        </label>
+        <button type="button" class="btn btn-gold" id="btnQuickApply">⚡ 套用三方案</button>
+        <label>推薦方案（客戶頁「推薦」標示）
+          <select id="recoSel">
+            <option value="">無</option>
+            <option value="0">方案一</option>
+            <option value="1">方案二</option>
+            <option value="2">方案三</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">依年齡自動套用上限：人壽 AT1 依年齡帶（例：15～17歲 600萬、66～70歲 1000萬）；產險依 DM 投保年齡（1000萬限 18 歲以上）。方案名稱自動帶類型＋保額（例：方案二 純產險 500萬），自訂名稱不受影響直到再次套用。</p>
+    </section>
+
     <section class="ed-card">
       <h2>行程資料 <small>（頁首只顯示：目的地、天數、日期；不顯示年齡）</small></h2>
       <div class="grid g2">
@@ -108,7 +131,7 @@
     </section>
 
     <section class="ed-card checks" id="checks"></section>
-  <p class="build-ver" id="buildVersion">昶勝軍版 115/10/06・旅行社分項費率（AT1 114/05/15、MR/OTA 115/06/11）</p>
+  <p class="build-ver" id="buildVersion">昶勝軍版 115/10/06・方案類型選單＋快速套用・旅行社分項費率（AT1 114/05/15、MR/OTA 115/06/11）</p>
   </form>
 
   <aside class="ed-preview">
@@ -123,14 +146,14 @@
   </aside>
 </div>
 
-<script src="js/vendor/pako.min.js?v=20261006fr2"></script>
-<script src="js/vendor/html2canvas.min.js?v=20261006fr2"></script>
-<script src="js/common.js?v=20261006fr2"></script>
-<script src="js/sample-data.js?v=20261006fr2"></script>
-<script src="js/presets.js?v=20261006fr2"></script>
-<script src="js/life-component-rates.js?v=20261006fr2"></script>
-<script src="js/life-rates.js?v=20261006fr2"></script>
-<script src="js/summary-export.js?v=20261006fr2"></script>
-<script src="js/editor.js?v=20261006fr2"></script>
+<script src="js/vendor/pako.min.js?v=20261006fr3"></script>
+<script src="js/vendor/html2canvas.min.js?v=20261006fr3"></script>
+<script src="js/common.js?v=20261006fr3"></script>
+<script src="js/sample-data.js?v=20261006fr3"></script>
+<script src="js/presets.js?v=20261006fr3"></script>
+<script src="js/life-component-rates.js?v=20261006fr3"></script>
+<script src="js/life-rates.js?v=20261006fr3"></script>
+<script src="js/summary-export.js?v=20261006fr3"></script>
+<script src="js/editor.js?v=20261006fr3"></script>
 </body>
 </html>

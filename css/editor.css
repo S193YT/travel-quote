@@ -291,3 +291,12 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--teal); bord
 .sum-cmp .cmp tr.prem td.miss { font-size: 13px; }
 .pv-frame:not(.full) .cmp tr.prem td.miss { font-size: 12.5px; }
 .sum-sample { background: #b3261e; }
+
+/* fr3：方案類型下拉＋快速套用 */
+.kind-sel { display: block; margin: 4px 0 10px; font-weight: 700; color: var(--navy); }
+.kind-sel select { display: block; width: 100%; margin-top: 4px; font-size: 16px; font-weight: 700; padding: 10px 12px; border: 2px solid var(--teal); border-radius: 10px; background: var(--tint-teal); color: var(--navy); }
+.quick-card { border: 2px solid var(--gold, #c9a24a); }
+.quick-row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+.quick-row label { flex: 1 1 220px; }
+.quick-row .btn { flex: 0 0 auto; min-height: 42px; }
+.name-state { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
