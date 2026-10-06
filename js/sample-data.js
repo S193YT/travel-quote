@@ -256,8 +256,8 @@ window.SAMPLE_QUOTE = {
   "extraNotes": [],
   "agent": {
     "unit": "高秉通訊處・昶勝軍",
-    "name": "蔡亞霖",
-    "title": "主任",
-    "phone": "0963-218-888"
+    "name": "王小明",
+    "title": "業務員",
+    "phone": "0912-345-678"
   }
 };

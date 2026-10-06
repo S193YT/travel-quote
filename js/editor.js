@@ -1,4 +1,4 @@
-/* 報價編輯器（昶勝軍 蔡亞霖主任版）：填寫 → 即時預覽 → 下載三方案總表圖／複製客戶頁連結（草稿自動存在瀏覽器）
+/* 報價編輯器（昶勝軍版）：填寫 → 即時預覽 → 下載三方案總表圖／複製客戶頁連結（草稿自動存在瀏覽器）
  * 改編自同仁的旅平險三方案報價工具；費率資料沿用原版（GPTA 離線表＋新快樂旅綜+ DM），未自行新增費率。
  * 產險保費：新快樂旅綜+ DM（天數 2～10）自動帶入；人壽保費：life-rates.js 精確相符才自動帶入。
  */
@@ -96,12 +96,17 @@
     return q;
   }
 
-  /** 預設三方案（亞霖主任習慣）：方案一 純人壽／方案二 純產險／方案三 人壽＋產險 */
+  /** 預設三方案：方案一 純人壽／方案二 純產險／方案三 人壽＋產險 */
   var PLAN_DEFAULTS = [
     { name: '方案一 純人壽', tagline: '高身故・高醫療（富邦人壽）', life: true, prop: false, at1: 500, death: 500 },
     { name: '方案二 純產險', tagline: '含旅行不便險（富邦產險）', life: false, prop: true, at1: 500, death: 500 },
     { name: '方案三 人壽＋產險', tagline: '壽＋產・保障最完整', life: true, prop: true, at1: 500, death: 200 }
   ];
+  /** 業務員資料（AgentProfile，localStorage 共用 key）→ 報價 agent 欄位 */
+  function agentForQuote() {
+    var a = window.AgentProfile ? AgentProfile.load() : { name: '', title: '', phone: '' };
+    return { unit: TQ.DEFAULT_AGENT.unit, name: a.name, title: a.title, phone: a.phone };
+  }
   function blankPlan(i) {
     var d = PLAN_DEFAULTS[i] || PLAN_DEFAULTS[2];
     return {
@@ -125,10 +130,8 @@
         if (hit) p.property.planCode = hit.code;
       }
     });
-    q.agent = q.agent || JSON.parse(JSON.stringify(TQ.DEFAULT_AGENT));
-    if (q.agent.phone === undefined) q.agent.phone = TQ.DEFAULT_AGENT.phone;
-    // 簽名不再列處經理（舊稿／舊連結一併移除）
-    delete q.agent.manager; delete q.agent.managerTitle;
+    // 簽名一律用本機「業務員資料」（兩個工具共用），不沿用草稿／連結裡別人的資料
+    q.agent = agentForQuote();
     var domesticDest = !!TQ.detectDomestic(q.destination);
     if (!q.lifeRegionPct) q.lifeRegionPct = domesticDest ? 100 : TQ.guessRegionPct(q.destination);
     if (!q.dateFormat) q.dateFormat = 'roc';
@@ -962,6 +965,7 @@
   function checks() {
     var out = [];
     function add(cls, msg) { out.push('<li class="' + cls + '">' + esc(msg) + '</li>'); }
+    if (window.AgentProfile) AgentProfile.problems(Q.agent).forEach(function (pr) { add(pr.level, pr.msg); });
     if (Q.sample) add('err', '目前標示為「範例資料」— 傳給客戶前請取消勾選並確認所有金額。');
     if (!Q.destination) add('warn', '尚未填寫目的地。');
     quoteBlockers().forEach(function (m) { add('err', m + '（目前無法下載三方案總表圖）'); });
@@ -1011,6 +1015,7 @@
 
   var saveTimer;
   function update() {
+    Q.agent = agentForQuote();
     updateDomesticWarning();
     refreshDerived();
     TQ.renderQuote(scrubForSave(Q), preview);
@@ -1127,13 +1132,23 @@
   });
 
 
+  /** 送出（下載圖／複製連結）時提醒：業務員資料未填 */
+  function agentReminder() {
+    var m = window.AgentProfile ? AgentProfile.missing(Q.agent) : [];
+    var smp = window.AgentProfile && AgentProfile.isSample(Q.agent);
+    if (!m.length && !smp) return '';
+    var card = document.getElementById('agentCard');
+    if (card) { card.classList.add('flash'); setTimeout(function () { card.classList.remove('flash'); }, 1600); }
+    return smp ? '⚠ 業務員資料仍是範例（' + AgentProfile.SAMPLE.name + '）' : '⚠ 尚未填寫業務員' + m.join('、') + '，客戶只會看到「昶勝軍」';
+  }
   document.getElementById('btnSummaryPng').addEventListener('click', function () {
     if (blockIfDomestic()) return;
     var btn = document.getElementById('btnSummaryPng');
     btn.disabled = true; btn.textContent = '產生中…';
     var clean = scrubForSave(Q);
+    var remind = agentReminder();
     TQ_SUMMARY.downloadSummaryPng(clean).then(function (name) {
-      toast('已下載 ' + name);
+      toast(remind ? remind + '（已下載 ' + name + '）' : '已下載 ' + name);
     }).catch(function (err) {
       alert('產生總表圖失敗：' + (err && err.message ? err.message : err));
     }).finally(function () {
@@ -1156,13 +1171,15 @@
   if (btnLink) btnLink.addEventListener('click', function () {
     if (blockIfDomestic()) return;
     var url = clientUrl();
+    var remind = agentReminder();
     copyText(url).then(function () {
-      toast(/^file:/.test(location.href) ? '已複製（本機檔案連結僅供自己預覽；上線後的連結才能傳給客戶）' : '已複製客戶頁連結，可貼到 LINE');
+      toast(remind ? remind + '（連結已複製）' : /^file:/.test(location.href) ? '已複製（本機檔案連結僅供自己預覽；上線後的連結才能傳給客戶）' : '已複製客戶頁連結，可貼到 LINE');
     }).catch(function () { prompt('請複製以下連結：', url); });
   });
   var btnOpen = document.getElementById('btnOpenClient');
   if (btnOpen) btnOpen.addEventListener('click', function () {
     if (blockIfDomestic()) return;
+    var remind = agentReminder(); if (remind) toast(remind);
     window.open(clientUrl(), '_blank');
   });
 
@@ -1195,6 +1212,14 @@
     buildPlanUI(); update();
   });
   window.TQ_EDITOR = { applyQuickPreset: applyQuickPreset, setPlanKind: function (i, k) { setPlanKind(i, k); buildPlanUI(); update(); }, getQuote: function () { return scrubForSave(Q); } };
+
+  /* ---------- 業務員資料（頁首區塊；與意外險工具共用） ---------- */
+  if (window.AgentProfile) AgentProfile.bind({
+    name: document.getElementById('agentName'), title: document.getElementById('agentTitle'), phone: document.getElementById('agentPhone'),
+    list: document.getElementById('agentTitleList'), sample: document.getElementById('agentSample'),
+    status: document.getElementById('agentStatus'), card: document.getElementById('agentCard'),
+    onChange: function () { if (Q) update(); }
+  });
 
   /* ---------- 初始化 ---------- */
   var regionSel = form.querySelector('[data-k="lifeRegionPct"]');

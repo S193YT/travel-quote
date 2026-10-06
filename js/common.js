@@ -27,17 +27,13 @@
       '<div class="' + prefix + '-title">' + BRAND.title + '</div></div></div>';
   }
 
-  // 預設簽名（昶勝軍 蔡亞霖主任）
-  var DEFAULT_AGENT = { unit: '高秉通訊處・昶勝軍', name: '蔡亞霖', title: '主任', phone: '0963-218-888' };
+  // 簽名：品牌固定「富邦人壽 高秉通訊處・昶勝軍」；姓名／職級／電話由業務員在編輯器「業務員資料」填寫（隨分享連結帶給客戶）
+  // 沒有業務員資料的舊連結 → 只顯示「昶勝軍」，不帶任何人名／電話
+  var DEFAULT_AGENT = { unit: '高秉通訊處・昶勝軍', name: '', title: '', phone: '' };
+  function agentStr(v, max) { return (v === undefined || v === null) ? '' : String(v).replace(/[\u0000-\u001f]/g, '').trim().slice(0, max); }
   function agentOf(quote) {
-    var a = (quote && quote.agent) || {};
-    return {
-      unit: isSet(a.unit) ? a.unit : DEFAULT_AGENT.unit,
-      name: isSet(a.name) ? a.name : DEFAULT_AGENT.name,
-      title: isSet(a.title) ? a.title : DEFAULT_AGENT.title,
-      // 有自訂簽名但沒填電話（例如舊版連結）→ 不硬塞預設電話
-      phone: (a.phone === undefined || a.phone === null) ? ((quote && quote.agent) ? '' : DEFAULT_AGENT.phone) : String(a.phone)
-    };
+    var a = (quote && quote.agent && typeof quote.agent === 'object') ? quote.agent : {};
+    return { unit: DEFAULT_AGENT.unit, name: agentStr(a.name, 20), title: agentStr(a.title, 20), phone: agentStr(a.phone, 24) };
   }
   function telHref(phone) { return 'tel:' + String(phone || '').replace(/[^\d+]/g, ''); }
 
@@ -633,11 +629,15 @@
     return h;
   }
   function agentParts(a) {
-    var segs = String(a.unit || '').split(/[・·]/).map(function (s) { return s.trim(); }).filter(Boolean);
+    // 通訊處／單位鎖定：一律「富邦人壽 高秉通訊處・昶勝軍」，忽略連結／草稿中的 unit
+    var segs = String(DEFAULT_AGENT.unit).split(/[・·]/).map(function (s) { return s.trim(); }).filter(Boolean);
     var team = segs.length > 1 ? segs[segs.length - 1] : '';
-    var org = segs.length > 1 ? segs.slice(0, -1).join('・') : String(a.unit || '');
+    var org = segs.length > 1 ? segs.slice(0, -1).join('・') : String(DEFAULT_AGENT.unit);
+    var name = String(a.name || '').trim();
     return {
-      line: (team ? team + ' ' : '') + (a.name || '') + (a.title || ''),
+      // 「昶勝軍 王小明 業務員」；未填姓名 → 「昶勝軍」
+      line: name ? [team, name, String(a.title || '').trim()].filter(Boolean).join(' ') : (team || '昶勝軍'),
+      hasPerson: !!name,
       org: '富邦人壽' + (org ? ' ' + org : '')
     };
   }

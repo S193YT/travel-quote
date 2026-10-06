@@ -9,14 +9,14 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>旅平險組合方案試算報價系統｜昶勝軍</title>
-<link rel="icon" type="image/png" href="img/favicon.png?v=20261006fr4">
-<link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=20261006fr4">
-<link rel="stylesheet" href="css/style.css?v=20261006fr4">
-<link rel="stylesheet" href="css/editor.css?v=20261006fr4">
+<link rel="icon" type="image/png" href="img/favicon.png?v=20261006fr5">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=20261006fr5">
+<link rel="stylesheet" href="css/style.css?v=20261006fr5">
+<link rel="stylesheet" href="css/editor.css?v=20261006fr5">
 </head>
 <body class="editor-body">
 <header class="ed-top">
-  <div class="ed-brand"><img class="ed-logo" src="img/logo.png?v=20261006fr4" alt="昶勝軍" width="42" height="42"><span class="ed-brand-text"><span class="ed-slogan">富邦人壽 高秉通訊處・昶勝軍</span><span class="ed-title"><b>旅平險組合方案試算報價系統</b><span class="ed-internal">內部使用・請勿傳給客戶</span></span></span></div>
+  <div class="ed-brand"><img class="ed-logo" src="img/logo.png?v=20261006fr5" alt="昶勝軍" width="42" height="42"><span class="ed-brand-text"><span class="ed-slogan">富邦人壽 高秉通訊處・昶勝軍</span><span class="ed-title"><b>旅平險組合方案試算報價系統</b><span class="ed-internal">內部使用・請勿傳給客戶</span></span></span></div>
   <div class="ed-actions">
     <button type="button" class="btn btn-gold" id="btnSummaryPng">🖼 下載三方案總表圖</button>
     <button type="button" class="btn" id="btnCopyLink" title="把客戶頁網址（報價資料全在網址內）複製下來貼到 LINE">🔗 複製客戶頁連結</button>
@@ -30,6 +30,17 @@
 
 <div class="ed-layout">
   <form class="ed-form" id="form" autocomplete="off" onsubmit="return false">
+    <section class="ed-card agent-card" id="agentCard">
+      <h2>👤 業務員資料 <small>（填一次即可：旅平險、意外險報價共用，只存在您這台裝置的瀏覽器）</small></h2>
+      <div class="grid agent-grid">
+        <label>姓名<input type="text" id="agentName" maxlength="20" placeholder="例：王小明" autocomplete="off"></label>
+        <label>職級／職稱<input type="text" id="agentTitle" maxlength="20" list="agentTitleList" placeholder="例：業務員、主任" autocomplete="off"></label>
+        <label>電話（客戶可點擊撥號）<input type="tel" id="agentPhone" maxlength="24" placeholder="例：0912-345-678" autocomplete="off"></label>
+      </div>
+      <datalist id="agentTitleList"></datalist>
+      <div class="agent-foot"><span class="agent-unit">單位：富邦人壽 高秉通訊處・昶勝軍（固定，不可修改）</span><button type="button" class="btn btn-sm" id="agentSample">載入範例</button></div>
+      <p class="agent-status" id="agentStatus" role="status"></p>
+    </section>
     <section class="ed-card quick-card" id="quickCard">
       <h2>方案設定 <small>（套用後各方案的類型、保額、名稱仍可在下方個別修改）</small></h2>
       <div class="quick-row">
@@ -122,13 +133,6 @@
     <section class="ed-card">
       <h2>附註（選填）</h2>
       <textarea data-k="extraNotesText" rows="3" placeholder="每行一則，會加在頁尾附註"></textarea>
-      <h2 style="margin-top:14px">簽名</h2>
-      <div class="grid g2">
-        <label>通訊處<input type="text" data-k="agent.unit"></label>
-        <label>業務員<input type="text" data-k="agent.name"></label>
-        <label>職稱<input type="text" data-k="agent.title"></label>
-        <label>電話（客戶頁可直接撥打）<input type="tel" data-k="agent.phone" placeholder="0963-218-888"></label>
-      </div>
     </section>
 
     <section class="ed-card checks" id="checks"></section>
@@ -147,14 +151,15 @@
   </aside>
 </div>
 
-<script src="js/vendor/pako.min.js?v=20261006fr4"></script>
-<script src="js/vendor/html2canvas.min.js?v=20261006fr4"></script>
-<script src="js/common.js?v=20261006fr4"></script>
-<script src="js/sample-data.js?v=20261006fr4"></script>
-<script src="js/presets.js?v=20261006fr4"></script>
-<script src="js/life-component-rates.js?v=20261006fr4"></script>
-<script src="js/life-rates.js?v=20261006fr4"></script>
-<script src="js/summary-export.js?v=20261006fr4"></script>
-<script src="js/editor.js?v=20261006fr4"></script>
+<script src="js/vendor/pako.min.js?v=20261006fr5"></script>
+<script src="js/vendor/html2canvas.min.js?v=20261006fr5"></script>
+<script src="js/agent-profile.js?v=20261006fr5"></script>
+<script src="js/common.js?v=20261006fr5"></script>
+<script src="js/sample-data.js?v=20261006fr5"></script>
+<script src="js/presets.js?v=20261006fr5"></script>
+<script src="js/life-component-rates.js?v=20261006fr5"></script>
+<script src="js/life-rates.js?v=20261006fr5"></script>
+<script src="js/summary-export.js?v=20261006fr5"></script>
+<script src="js/editor.js?v=20261006fr5"></script>
 </body>
 </html>
