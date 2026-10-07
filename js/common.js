@@ -622,12 +622,35 @@
     if (!(a > 0) || !(d > 0)) return '';
     return a === d ? '各' + a + '萬' : '壽' + a + '萬／產' + d + '萬';
   }
+  /** 醫療加值：人壽「國外旅遊醫療加值」組合（OH1／MR＝AT1×20%）或 產險勾「醫療加值」（計畫二） */
+  function isMedPlus(p) {
+    if (!p) return false;
+    var k = planKind(p);
+    var lp = k !== 'prop' && p.life && p.life.combo === 'plus';
+    var pp = k !== 'life' && p.property && !!p.property.medPlus;
+    return !!(lp || pp);
+  }
   function autoPlanName(p, idx, quote) {
     var t = planTierText(p, quote);
-    return '方案' + (CN_NUM.charAt(idx) || String(idx + 1)) + ' ' + PLAN_KIND_LABEL[planKind(p)] + (t ? ' ' + t : '');
+    return '方案' + (CN_NUM.charAt(idx) || String(idx + 1)) + ' ' + PLAN_KIND_LABEL[planKind(p)] + (t ? ' ' + t : '') + (isMedPlus(p) ? '・醫療加值' : '');
+  }
+  /** 保障高低：意外身故 → 住院 → 門診 → 意外醫療 → 保費（同保障時保費高者通常項目較多） */
+  function protectionKey(p, quote) {
+    var c = computePlan(p, quote);
+    return [c.death || 0, c.hospital || 0, c.outpatient || 0, c.accidentMedical || 0, isMedPlus(p) ? 1 : 0, c.premium || 0];
+  }
+  function bestProtectionIndex(quote) {
+    var best = -1, bk = null;
+    (quote.plans || []).forEach(function (p, i) {
+      if (planKind(p) === 'none') return;
+      var k = protectionKey(p, quote);
+      if (!bk) { best = i; bk = k; return; }
+      for (var j = 0; j < k.length; j++) { if (k[j] > bk[j]) { best = i; bk = k; return; } if (k[j] < bk[j]) return; }
+    });
+    return best;
   }
   /** 舊稿／舊連結（無 nameCustom）：名稱為預設樣式（方案X＋類型＋保額）→ 視為自動，依勾選重新推導（修正名稱與勾選不一致） */
-  var AUTO_NAME_RE = /^\s*(方案\s*[一二三四五六七八九十0-9]+)?[\s\u3000:：・\-]*(純人壽|純產險|人壽\s*[＋+]\s*產險|壽\s*[＋+]\s*產|未選擇類型)?\s*(各|壽)?\s*(\d+\s*萬)?\s*([／\/]\s*產?\s*\d+\s*萬)?\s*$/;
+  var AUTO_NAME_RE = /^\s*(方案\s*[一二三四五六七八九十0-9]+)?[\s\u3000:：・\-]*(純人壽|純產險|人壽\s*[＋+]\s*產險|壽\s*[＋+]\s*產|未選擇類型)?\s*(各|壽)?\s*(\d+\s*萬)?\s*([／\/]\s*產?\s*\d+\s*萬)?\s*([・·]?\s*醫療加值)?\s*$/;
   function nameIsAuto(p) {
     if (!p) return true;
     if (p.nameCustom === true) return false;
@@ -893,7 +916,10 @@
     var prodBits = [];
     if (anyLife) prodBits.push('人壽＝' + LIFE_PRODUCT);
     if (anyProp) prodBits.push('產險＝' + PROPERTY_PRODUCT +
-      (quote.schengen ? '【計畫二・醫療加值／申根適用，海外突發疾病住院 150萬】' : '【計畫一・國外旅遊適用】'));
+      (quote.schengen ? '【計畫二・醫療加值／申根適用，海外突發疾病住院 150萬】'
+        : (quote.plans || []).some(function (p) { return p.property && p.property.enabled !== false && p.property.medPlus; })
+          ? '【計畫一・國外旅遊適用；標示「醫療加值」之方案產險為計畫二・醫療加值，海外突發疾病住院 150萬（含法定傳染病）】'
+          : '【計畫一・國外旅遊適用】'));
     if (prodBits.length) notes.push(prodBits.join('；') + '。');
     if (quote.dayRule === DAY_RULE && quote.startDate && quote.endDate) {
       notes.push('保險期間自出發日時起算，每 24 小時為一天（本報價共 ' + (quote.days || '—') + ' 天，結束時間同出發時間）；實際以保險單所載日時為準。');
@@ -1018,7 +1044,8 @@
   function resolvePropertyPreset(prop, quote) {
     var list = (global.PROPERTY_PRESETS && global.PROPERTY_PRESETS.plans) || [];
     if (!prop) return null;
-    var schengen = !!(quote && quote.schengen);
+    // 計畫二（醫療加值・海突住院150萬・含法傳）：申根一律；非申根可勾「產險醫療加值」（DM：富邦產險開放非申根國亦可選擇投保醫療加值型）
+    var schengen = !!(quote && quote.schengen) || !!prop.medPlus;
     var code = prop.planCode || '';
     // 未滿15足歲 → 只能投保兒童方案（DM 投保年齡「未滿15足歲」）：計畫一 P1-CHILD／申根 P2-CHILD（可進階手選 P2-CHILD 醫療加值）
     if (quote && isChildQuote(quote)) {
@@ -1252,7 +1279,7 @@
     BRAND: BRAND, renderBrand: renderBrand, DEFAULT_AGENT: DEFAULT_AGENT, agentOf: agentOf, telHref: telHref,
     bracket: bracket, deathSplit: deathSplit, brandLogoReady: function () { return brandLogoReady; },
     renderQuote: renderQuote, renderPlanCard: renderPlanCard, titleFor: titleFor, esc: esc,
-    PLAN_KINDS: PLAN_KINDS, PLAN_KIND_LABEL: PLAN_KIND_LABEL, AUTO_TAGLINE: AUTO_TAGLINE, planKind: planKind, planTierText: planTierText,
+    PLAN_KINDS: PLAN_KINDS, isMedPlus: isMedPlus, protectionKey: protectionKey, bestProtectionIndex: bestProtectionIndex, PLAN_KIND_LABEL: PLAN_KIND_LABEL, AUTO_TAGLINE: AUTO_TAGLINE, planKind: planKind, planTierText: planTierText,
     autoPlanName: autoPlanName, nameIsAuto: nameIsAuto, taglineIsAuto: taglineIsAuto, planName: planName, planTagline: planTagline,
     resolvePlanNames: resolvePlanNames, uniformKind: uniformKind,
     splitPlanName: splitPlanName, priceInfo: priceInfo, priceHtml: priceHtml, compareData: compareData, compareTableHtml: compareTableHtml,

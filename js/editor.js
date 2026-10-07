@@ -171,6 +171,8 @@
       p.name = TQ.planName(p, idx, q);
       p.tagline = TQ.planTagline(p);
     });
+    // 推薦：fr8 起預設「自動＝保障最高」；只有明確手動選擇（recoMode='manual'）才沿用
+    if (q.recoMode !== 'manual') q.recoMode = 'auto';
     q._draftVersion = DRAFT_VERSION;
     return q;
   }
@@ -199,6 +201,14 @@
   function syncRecoSelect() {
     var sel = document.getElementById('recoSel');
     if (!sel || !Q) return;
+    if (Q.recoMode !== 'manual') {
+      var mo = sel.querySelector('option[value="multi"]'); if (mo) mo.remove();
+      sel.value = 'auto';
+      var ai = Q.plans.map(function (p) { return !!p.recommended; }).indexOf(true);
+      var ao = sel.querySelector('option[value="auto"]');
+      if (ao) ao.textContent = '自動：保障最高' + (ai >= 0 ? '（目前＝方案' + '一二三'.charAt(ai) + '）' : '');
+      return;
+    }
     var on = [];
     Q.plans.forEach(function (p, i) { if (p.recommended) on.push(i); });
     var multi = sel.querySelector('option[value="multi"]');
@@ -210,6 +220,12 @@
       if (multi) multi.remove();
       sel.value = on.length ? String(on[0]) : '';
     }
+  }
+  /** 推薦（fr8）：預設「自動」＝保障最高的方案（意外身故→住院→門診→意外醫療→醫療加值→保費）；手動選擇後依選擇 */
+  function applyAutoReco() {
+    if (!Q || Q.recoMode === 'manual') return;
+    var bi = TQ.bestProtectionIndex(Q);
+    Q.plans.forEach(function (p, i) { p.recommended = i === bi; });
   }
   /** 設定方案類型（純人壽／純產險／人壽＋產險）：唯一的類型來源，名稱／副標隨之推導 */
   function setPlanKind(i, kind) {
@@ -246,6 +262,8 @@
         var a = Math.max(100, Math.min(t, cap));
         if (a !== t && !child) notes.push('方案' + '一二三'.charAt(i) + ' 人壽 ' + t + '萬超過「' + ai.label + '」AT1 上限，改為 ' + a + '萬');
         p.life.at1Wan = a; p.life.premium = null; p.life._premAuto = false;
+        // 最高檔（1000萬）＝醫療加值（OH1／MR＝AT1×20%）；200／500萬＝國外旅遊適用
+        p.life.combo = i === 2 ? 'plus' : 'basic';
       }
       if (kind !== 'life') {
         var d = null;
@@ -253,10 +271,12 @@
         if (d == null) d = propOpts[0] || t;
         if (d !== t && !child) notes.push('方案' + '一二三'.charAt(i) + ' 產險 ' + t + '萬不符 DM 投保年齡，改為 ' + d + '萬');
         p.property.deathWan = d; p.property.planCode = ''; p.property._appliedCode = null; p.property.premium = null;
+        p.property.medPlus = i === 2; // 最高檔產險＝計畫二 醫療加值（海突住院150萬・含法傳）
       }
       p.nameCustom = false; p.taglineCustom = false;
     });
     if (child) notes.push('未滿15足歲：人壽為 MRC 60萬、產險為兒童方案，無 200／500／1000萬檔次，請再調整各方案');
+    Q.recoMode = 'auto'; // 推薦＝保障最高（方案三 1000萬・醫療加值）
     activePlan = 0;
     buildPlanUI(); update();
     toast('已套用三方案' + TQ.PLAN_KIND_LABEL[kind] + ' 200／500／1000萬' + (notes.length ? '｜' + notes.join('；') : ''));
@@ -743,9 +763,12 @@
         '<span class="hint auto">未滿15足歲只能投保兒童方案；DM：無意外死亡之喪葬費用保險金（身故及失能「-」）</span></label>';
     } else {
       h += selectField('產險保額（萬）', b + 'property.deathWan', withCurrent(propertyDeathOptionsFor(ai), plan.property.deathWan, '不符 DM 投保年齡'), {
-        hint: Q.schengen ? '計畫二 P2-G*（突發疾病住院 150萬）' : '計畫一 P1-G*',
+        hint: (Q.schengen || plan.property.medPlus) ? '計畫二 P2-G*（醫療加值：海外突發疾病住院 150萬・含法定傳染病）' : '計畫一 P1-G*（國外旅遊適用）',
         auto: true
       });
+    }
+    if (hasProp && !Q.schengen) {
+      h += '<label class="check medplus-check"><input type="checkbox" data-k="' + b + 'property.medPlus"> 產險醫療加值（計畫二：海外突發疾病住院 150萬・含法定傳染病；DM 開放非申根國投保）</label>';
     }
     h += '</div>';
     // 查無費率時（申根人壽／產險超過 DM 天數）直接在這裡手填保費
@@ -899,12 +922,12 @@
     }
     var mAt = /^plans\.(\d+)\.life\.(at1Wan|childOh1Wan|oh1Wan|mrWan|oaa|enabled|combo)$/.exec(k);
     if (mAt) delete skipAutoOnce.life[Number(mAt[1])];
-    var mPc = /^plans\.(\d+)\.property\.(planCode|deathWan|hospitalWan)$/.exec(k);
+    var mPc = /^plans\.(\d+)\.property\.(planCode|deathWan|hospitalWan|medPlus)$/.exec(k);
     if (mPc) {
       var pi = Number(mPc[1]);
       delete skipAutoOnce.prop[pi];
       // 保額或方案變了 → 強制重套不便險／保障；改保額時清掉舊 planCode 以免蓋回
-      if (mPc[2] === 'deathWan') {
+      if (mPc[2] === 'deathWan' || mPc[2] === 'medPlus') {
         Q.plans[pi].property._appliedCode = null;
         Q.plans[pi].property.planCode = '';
       } else if (mPc[2] === 'planCode') {
@@ -959,6 +982,17 @@
     updateDaysDisplay(dsNow);
     syncPlanNames();
     var needRebuild = applyAutoPremiums();
+    var recoBefore = Q.plans.map(function (p) { return !!p.recommended; }).join();
+    applyAutoReco();
+    if (recoBefore !== Q.plans.map(function (p) { return !!p.recommended; }).join()) {
+      Q.plans.forEach(function (p, i) { var tab = planTabs.children[i]; if (tab) tab.classList.toggle('reco', !!p.recommended); });
+      Array.prototype.forEach.call(planForms.querySelectorAll('[data-plan]'), function (sec, i) {
+        var h2 = sec.querySelector('h2'), bd = h2 && h2.querySelector('.reco-badge');
+        if (Q.plans[i].recommended && h2 && !bd) h2.insertAdjacentHTML('beforeend', ' <span class="reco-badge" style="font-size:13px">推薦</span>');
+        if (!Q.plans[i].recommended && bd) bd.remove();
+      });
+    }
+    syncRecoSelect();
     if (needRebuild && !rebuildingUI) {
       // 保障項目列數變了，重建表單一次（_appliedCode 已寫入，不會迴圈）
       buildPlanUI();
@@ -1151,7 +1185,7 @@
     if (t.hasAttribute('data-k') && (t.type === 'checkbox' || t.tagName === 'SELECT')) {
       readInput(t);
       if (t.getAttribute('data-k') === 'schengen') { buildPlanUI(); return; }
-      if (/^plans\.\d+\.(kind|(life|property)\.enabled|life\.combo|life\.at1Wan)$/.test(t.getAttribute('data-k'))) { buildPlanUI(); update(); return; }
+      if (/^plans\.\d+\.(kind|(life|property)\.enabled|life\.combo|life\.at1Wan|property\.medPlus)$/.test(t.getAttribute('data-k'))) { buildPlanUI(); update(); return; }
       update();
     }
   });
@@ -1269,6 +1303,8 @@
   if (recoSel) recoSel.addEventListener('change', function () {
     var v = recoSel.value;
     if (v === 'multi') return;
+    if (v === 'auto') { Q.recoMode = 'auto'; applyAutoReco(); buildPlanUI(); update(); return; }
+    Q.recoMode = 'manual';
     Q.plans.forEach(function (p, i) { p.recommended = v !== '' && String(i) === v; });
     buildPlanUI(); update();
   });

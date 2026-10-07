@@ -9,14 +9,14 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>旅平險組合方案試算報價系統｜昶勝軍</title>
-<link rel="icon" type="image/png" href="img/favicon.png?v=20261007fr7">
-<link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=20261007fr7">
-<link rel="stylesheet" href="css/style.css?v=20261007fr7">
-<link rel="stylesheet" href="css/editor.css?v=20261007fr7">
+<link rel="icon" type="image/png" href="img/favicon.png?v=20261007fr8">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=20261007fr8">
+<link rel="stylesheet" href="css/style.css?v=20261007fr8">
+<link rel="stylesheet" href="css/editor.css?v=20261007fr8">
 </head>
 <body class="editor-body">
 <header class="ed-top">
-  <div class="ed-brand"><img class="ed-logo" src="img/logo.png?v=20261007fr7" alt="昶勝軍" width="42" height="42"><span class="ed-brand-text"><span class="ed-slogan">富邦人壽 高秉通訊處・昶勝軍</span><span class="ed-title"><b>旅平險組合方案試算報價系統</b><span class="ed-internal">內部使用・請勿傳給客戶</span></span></span></div>
+  <div class="ed-brand"><img class="ed-logo" src="img/logo.png?v=20261007fr8" alt="昶勝軍" width="42" height="42"><span class="ed-brand-text"><span class="ed-slogan">富邦人壽 高秉通訊處・昶勝軍</span><span class="ed-title"><b>旅平險組合方案試算報價系統</b><span class="ed-internal">內部使用・請勿傳給客戶</span></span></span></div>
   <div class="ed-actions">
     <button type="button" class="btn btn-gold" id="btnSummaryPng">🖼 下載三方案總表圖</button>
     <button type="button" class="btn" id="btnCopyLink" title="把客戶頁網址（報價資料全在網址內）複製下來貼到 LINE">🔗 複製客戶頁連結</button>
@@ -54,6 +54,7 @@
         <button type="button" class="btn btn-gold" id="btnQuickApply">⚡ 套用三方案</button>
         <label>推薦方案（客戶頁「推薦」標示）
           <select id="recoSel">
+            <option value="auto">自動：保障最高</option>
             <option value="">無</option>
             <option value="0">方案一</option>
             <option value="1">方案二</option>
@@ -61,7 +62,7 @@
           </select>
         </label>
       </div>
-      <p class="hint">依年齡自動套用上限：人壽 AT1 依年齡帶（例：15～17歲 600萬、66～70歲 1000萬）；產險依 DM 投保年齡（1000萬限 18 歲以上）。方案名稱自動帶類型＋保額（例：方案二 純產險 500萬），自訂名稱不受影響直到再次套用。</p>
+      <p class="hint">依年齡自動套用上限：人壽 AT1 依年齡帶（例：15～17歲 600萬、66～70歲 1000萬）；產險依 DM 投保年齡（1000萬限 18 歲以上）。方案名稱自動帶類型＋保額（例：方案二 純產險 500萬），自訂名稱不受影響直到再次套用。快速套用時方案三（1000萬）為「醫療加值」（人壽 OH1／MR＝AT1×20%；產險計畫二：海突住院 150萬・含法傳）。推薦預設「自動：保障最高」。</p>
     </section>
 
     <section class="ed-card">
@@ -156,15 +157,15 @@
   </aside>
 </div>
 
-<script src="js/vendor/pako.min.js?v=20261007fr7"></script>
-<script src="js/vendor/html2canvas.min.js?v=20261007fr7"></script>
-<script src="js/agent-profile.js?v=20261007fr7"></script>
-<script src="js/common.js?v=20261007fr7"></script>
-<script src="js/sample-data.js?v=20261007fr7"></script>
-<script src="js/presets.js?v=20261007fr7"></script>
-<script src="js/life-component-rates.js?v=20261007fr7"></script>
-<script src="js/life-rates.js?v=20261007fr7"></script>
-<script src="js/summary-export.js?v=20261007fr7"></script>
-<script src="js/editor.js?v=20261007fr7"></script>
+<script src="js/vendor/pako.min.js?v=20261007fr8"></script>
+<script src="js/vendor/html2canvas.min.js?v=20261007fr8"></script>
+<script src="js/agent-profile.js?v=20261007fr8"></script>
+<script src="js/common.js?v=20261007fr8"></script>
+<script src="js/sample-data.js?v=20261007fr8"></script>
+<script src="js/presets.js?v=20261007fr8"></script>
+<script src="js/life-component-rates.js?v=20261007fr8"></script>
+<script src="js/life-rates.js?v=20261007fr8"></script>
+<script src="js/summary-export.js?v=20261007fr8"></script>
+<script src="js/editor.js?v=20261007fr8"></script>
 </body>
 </html>
