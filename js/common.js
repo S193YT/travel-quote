@@ -340,6 +340,7 @@
       life: L, prop: P, child: child,
       lifePremiumMissing: L.enabled && !isSet(life.premium),
       propPremiumMissing: P.enabled && !isSet(prop.premium),
+      propTooShort: P.enabled && !isSet(prop.premium) && num(quote.days) === 1, // 富邦產險系統：國外旅遊保險期間至少 2 日
       lifeOverCap: L.enabled && !child && (function () { var a = ageInfo(quote.age); return a.valid && num(life.at1Wan) > a.at1Max; })(),
       death: L.at1 + P.death,
       transportDeath: L.at1 + L.transportExtra + P.death,
@@ -530,7 +531,7 @@
     if (!L.enabled && !P.enabled) return '<b>未選擇人壽或產險</b>';
     if (c.lifePremiumMissing || c.propPremiumMissing) {
       var lt = c.lifePremiumMissing ? (c.lifeOverCap ? 'AT1 超過年齡上限' : '需另行試算') : comma(L.premium);
-      var pt = c.propPremiumMissing ? '需另行試算' : comma(P.premium);
+      var pt = c.propPremiumMissing ? (c.propTooShort ? '最少需投保 2 天' : '需另行試算') : comma(P.premium);
       if (L.enabled && P.enabled) {
         return '壽 <b>' + lt + '</b> ＋ 產 <b>' + pt + '</b>（' +
           (c.lifePremiumMissing && c.propPremiumMissing ? '保費另計' : c.lifePremiumMissing ? '人壽保費另計' : '產險保費另計') + '）';
@@ -741,7 +742,7 @@
     if (!L.enabled && !P.enabled) return { amount: null, miss: '未選擇人壽或產險', sub: '' };
     if (c.lifePremiumMissing || c.propPremiumMissing) {
       var who = (c.lifePremiumMissing && c.propPremiumMissing) ? '人壽、產險' : c.lifePremiumMissing ? '人壽' : '產險';
-      var miss = (c.lifePremiumMissing && c.lifeOverCap) ? 'AT1 超過年齡上限' : who + '保費需另行試算';
+      var miss = (c.lifePremiumMissing && c.lifeOverCap) ? 'AT1 超過年齡上限' : (c.propTooShort && !c.lifePremiumMissing) ? '產險最少需投保 2 天' : who + '保費需另行試算';
       var sub = '';
       if (L.enabled && P.enabled) {
         if (!c.lifePremiumMissing) sub = '人壽 ' + comma(L.premium) + '＋產險另計（請以產險系統試算）';
@@ -1083,6 +1084,12 @@
     if (a.age >= min && a.age <= max) return { ok: true };
     return { ok: false, tip: preset.label + ' 投保年齡為「' + preset.ageLabel + '」（DM），' + a.age + ' 歲不可投保' };
   }
+  /** [2,3,...,10,11,12,15] → '2～12、15' */
+  function dayList(keys) {
+    var out = [], i = 0;
+    while (i < keys.length) { var j = i; while (j + 1 < keys.length && keys[j + 1] === keys[j] + 1) j++; out.push(j > i ? keys[i] + '～' + keys[j] : String(keys[i])); i = j + 1; }
+    return out.join('、');
+  }
   /** 產險保費查表：僅 DM 有列的天數（通常 2～10），绝不內插；保額／方案變更時一併帶保障項目 */
   function lookupPropertyPremium(prop, days, quote) {
     var d = num(days);
@@ -1101,11 +1108,14 @@
     if (!isFinite(d) || d <= 0) {
       return { found: false, outOfRange: false, tip: '請先填投保天數', preset: preset };
     }
+    if (d < 2) {
+      return { found: false, outOfRange: true, tooShort: true, tip: '產險最少需投保 2 天（富邦產險系統：國外旅遊保險期間至少需 2 日）', preset: preset, dayMin: minD, dayMax: maxD };
+    }
     if (d < minD || d > maxD || table[String(d)] === undefined) {
       return {
         found: false,
         outOfRange: true,
-        tip: '新快樂旅綜+ DM 費率表僅列 ' + minD + '～' + maxD + ' 天，目前 ' + d + ' 天無表列保費，請向產險試算後手填（禁止推估）',
+        tip: '新快樂旅綜+ 費率（DM 2～10 天＋B2B 系統試算）此保額僅有 ' + dayList(keys) + ' 天，目前 ' + d + ' 天無資料，請向產險試算後手填（禁止推估）',
         preset: preset,
         dayMin: minD,
         dayMax: maxD
@@ -1115,7 +1125,7 @@
     return {
       found: true,
       premium: prem,
-      tip: '自動：' + comma(prem) + ' 元（' + preset.label + '／' + d + '天／DM）',
+      tip: '自動：' + comma(prem) + ' 元（' + preset.label + '／' + d + '天／' + (d <= 10 ? 'DM' : 'B2B 系統試算 2026-10-07') + '）',
       preset: preset,
       dayMin: minD,
       dayMax: maxD

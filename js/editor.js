@@ -374,7 +374,7 @@
       else if (st.legacy) subTxt = '沿用原報價天數（舊版連結）；依新制（結束時間＝出發時間）應為 ' + st.newDays + ' 天，修改日期／時間／天數即改依新制重算';
       else if (st.noTime) subTxt = '⚠ 出發時間未填：請填班機實際起飛時間（結束時間同出發時間）';
       else subTxt = '自出發時間起算，每 24 小時一天；結束時間＝出發時間 ' + TQ.fmtTime(Q.startTime);
-      if (st.days > 30) { soft = true; warn = '⚠ 目前 ' + st.days + ' 天：人壽（亞洲14國）可自動算到 180 天；產險 DM 費率僅 2～10 天、未滿15歲人壽僅 1～30 天，其餘請以 GPTA／產險試算後手填'; }
+      if (st.days > 30) { soft = true; warn = '⚠ 目前 ' + st.days + ' 天：人壽（亞洲14國）可自動算到 180 天；產險費率僅 2～20、25、30 天（部分保額）、未滿15歲人壽僅 1～30 天，其餘請以 GPTA／產險試算後手填'; }
     }
     if (v) v.textContent = txt;
     if (sub) { sub.textContent = subTxt; sub.classList.toggle('warn', !!(st.legacy || (st.noTime && !st.kept))); }
@@ -401,6 +401,7 @@
         out.push('⚠ ' + n + '：人壽 AT1 ' + p.life.at1Wan + ' 萬超過「' + ai.label + '」上限 ' + ai.at1Max + ' 萬，請調降');
       }
       if (!propOn(p)) return;
+      if (TQ.num(Q.days) === 1) out.push('⚠ ' + n + '：產險最少需投保 2 天（富邦產險系統：國外旅遊保險期間至少需 2 日）；請改天數或改純人壽');
       var pre = TQ.resolvePropertyPreset(p.property, Q);
       var ac = TQ.propertyAgeCheck(pre, Q);
       if (!ac.ok) out.push('⚠ ' + n + '：產險' + ac.tip);
@@ -614,7 +615,7 @@
 
       bannerBits.push(
         (p.name || ('方案' + (i + 1))) + '：壽' + (!p.life.enabled ? '不含' : (p.life._premAuto ? '自動' : '手填／缺表')) +
-        '／產' + (!propOn(p) ? '不含' : (p.property._premAuto ? '自動' : (p.property._premTip && p.property._premTip.indexOf('僅列') >= 0 ? '超出DM' : '手填／未對應')))
+        '／產' + (!propOn(p) ? '不含' : (p.property._premAuto ? '自動' : (p.property._premTip && p.property._premTip.indexOf('無資料') >= 0 ? '無費率' : '手填／未對應')))
       );
     });
     var el = document.getElementById('autoPremiumBanner');
@@ -774,7 +775,7 @@
     // 查無費率時（申根人壽／產險超過 DM 天數）直接在這裡手填保費
     h += '<div class="grid g2 quick-prem">' +
       (hasLife ? field('人壽保費（元）', b + 'life.premium', { ph: 'GPTA 試算後填入', hint: '查表有值會自動帶入；可手改' }) : '') +
-      (hasProp ? field('產險保費（元）', b + 'property.premium', { ph: '產險試算後填入', hint: 'DM 表列 2～10 天自動；其他天數手填' }) : '') +
+      (hasProp ? field('產險保費（元）', b + 'property.premium', { ph: '產險試算後填入', hint: '2～20、25、30 天自動（DM＋B2B 試算）；其他天數手填' }) : '') +
       '</div>';
     h += '<p class="hint" data-life-prem-tip="' + i + '"></p>';
     h += '<p class="hint" data-prop-prem-tip="' + i + '"></p>';
@@ -1065,7 +1066,7 @@
     if (dsC.days > 180 && Q.plans.some(function (p) { return p.life && p.life.enabled; })) add('err', '共 ' + dsC.days + ' 天：Go安行國外旅遊最高投保天數為 180 天（DM 第2頁）。');
     var riC = TQ.regionInfo(Q.destination);
     if (riC.ambiguous.length) add('warn', '目的地含「' + riC.ambiguous.join('、') + '」：DM 未明列是否屬「美國、加拿大」或「歐洲」，人壽 OH1 地區限額預設 100%；如確認適用請到「行程進階」手動調整。');
-    if (dsC.days > 30) add('warn', '共 ' + dsC.days + ' 天：人壽亞洲14國可自動算到 180 天；產險 DM 費率僅 2～10 天、未滿15歲人壽僅 1～30 天，其餘請以 GPTA／產險試算後手填。');
+    if (dsC.days > 30) add('warn', '共 ' + dsC.days + ' 天：人壽亞洲14國可自動算到 180 天；產險費率僅 2～20、25、30 天（部分保額）、未滿15歲人壽僅 1～30 天，其餘請以 GPTA／產險試算後手填。');
     Q.plans.forEach(function (p) {
       var n = p.name || '';
       if (p.life && p.life.enabled) {
@@ -1075,7 +1076,7 @@
         else add('ok', n + '：人壽保費已自動帶入。');
       }
       if (!propOn(p)) return;
-      if (!TQ.isSet(p.property.premium)) add('err', n + '：產險保費需另行試算、尚未填入（' + (p.property._premTip || 'DM 表列僅 2～10 天') + '）；未填前客戶頁／比較表／總表圖顯示「需另行試算」。');
+      if (!TQ.isSet(p.property.premium)) add('err', n + '：產險保費需另行試算、尚未填入（' + (p.property._premTip || '查無費率') + '）；未填前客戶頁／比較表／總表圖顯示「需另行試算」。');
       else if (!p.property._premAuto) add('warn', n + '：產險保費非 DM 自動（' + (p.property._premTip || '手填') + '）。');
       else add('ok', n + '：產險保費已自動帶入（DM）。');
       if (!TQ.num(p.property.deathWan)) add('warn', n + '：產險意外身故失能未填。');
