@@ -393,7 +393,15 @@
    * 時間未填：視為出發、回程同一時刻（只填一邊 → 另一邊比照同一時刻）→ 天數＝日期相減（不再算頭算尾）。
    * 同一天來回＝1 天（最少 1 天）。
    */
-  var DAY_RULE = 'h24';
+  var DAY_RULE = 'start24';     // fr7：結束時間＝出發時間，天數＝日數差（或直接填天數）
+  var DAY_RULE_FR6 = 'h24';      // fr6：另有回程時間
+  /** 'YYYY-MM-DD' + n 天 */
+  function addDays(s, n) {
+    var p = parseDateParts(s);
+    if (!p || !isFinite(Number(n))) return '';
+    var d = new Date(Date.UTC(p.y, p.m - 1, p.d) + Number(n) * 86400000);
+    return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
+  }
   function parseTime(s) {
     var m = /^\s*(\d{1,2}):(\d{2})/.exec(String(s == null ? '' : s));
     if (!m) return null;
@@ -888,6 +896,8 @@
       (quote.schengen ? '【計畫二・醫療加值／申根適用，海外突發疾病住院 150萬】' : '【計畫一・國外旅遊適用】'));
     if (prodBits.length) notes.push(prodBits.join('；') + '。');
     if (quote.dayRule === DAY_RULE && quote.startDate && quote.endDate) {
+      notes.push('保險期間自出發日時起算，每 24 小時為一天（本報價共 ' + (quote.days || '—') + ' 天，結束時間同出發時間）；實際以保險單所載日時為準。');
+    } else if (quote.dayRule === DAY_RULE_FR6 && quote.startDate && quote.endDate) {
       notes.push('保險期間依出發／回程日期與時間計算：每滿 24 小時為一天，未滿 24 小時以一天計（本報價共 ' + (quote.days || '—') + ' 天）；實際以保險單所載日時為準。');
     }
     if (quote.schengen) {
@@ -1232,7 +1242,7 @@
     transportLine: transportLine, regionChipText: regionChipText, lifeExtraItems: lifeExtraItems,
     textHasKeyword: textHasKeyword, computePlan: computePlan,
     fmtDate: fmtDate, daysInclusive: daysInclusive, parseDateParts: parseDateParts,
-    periodHtml: periodHtml, DAY_RULE: DAY_RULE, parseTime: parseTime, fmtTime: fmtTime, periodDays: periodDays, quotePeriodDays: quotePeriodDays, fmtDateTime: fmtDateTime, periodText: periodText,
+    periodHtml: periodHtml, DAY_RULE: DAY_RULE, DAY_RULE_FR6: DAY_RULE_FR6, addDays: addDays, parseTime: parseTime, fmtTime: fmtTime, periodDays: periodDays, quotePeriodDays: quotePeriodDays, fmtDateTime: fmtDateTime, periodText: periodText,
     encodeQuote: encodeQuote, decodeHash: decodeHash, shareUrl: shareUrl,
     findPropertyPreset: findPropertyPreset, resolvePropertyPreset: resolvePropertyPreset, lookupPropertyPremium: lookupPropertyPremium,
     detectSchengen: detectSchengen,

@@ -323,3 +323,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--teal); bord
 /* fr6：保險期間（日期＋時間、每滿 24 小時一天） */
 .days-auto-sub.warn { color: #9a5b00; font-weight: 700; }
 #form input[type="time"] { min-width: 0; }
+
+/* fr7：輸入方式（填天數／填回程日期），結束時間唯讀 */
+.date-row .mode-sel { grid-column: 1 / -1; max-width: 260px; }
+.date-row.mode-days .m-range, .date-row.mode-range .m-days { display: none; }
+#endTimeRO { background: #f3f6f8; color: #33607a; }
