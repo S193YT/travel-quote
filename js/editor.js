@@ -374,7 +374,7 @@
       else if (st.legacy) subTxt = '沿用原報價天數（舊版連結）；依新制（結束時間＝出發時間）應為 ' + st.newDays + ' 天，修改日期／時間／天數即改依新制重算';
       else if (st.noTime) subTxt = '⚠ 出發時間未填：請填班機實際起飛時間（結束時間同出發時間）';
       else subTxt = '自出發時間起算，每 24 小時一天；結束時間＝出發時間 ' + TQ.fmtTime(Q.startTime);
-      if (st.days > 30) { soft = true; warn = '⚠ 目前 ' + st.days + ' 天：人壽（亞洲14國）可自動算到 180 天；產險費率僅 2～20、25、30 天（部分保額）、未滿15歲人壽僅 1～30 天，其餘請以 GPTA／產險試算後手填'; }
+      if (st.days > 30) { soft = true; warn = '⚠ 目前 ' + st.days + ' 天：人壽（亞洲14國）可自動算到 180 天；產險成人 200／500／1000萬可到 60 天（300萬 2～30 天缺 12～14、16～20；1500萬部分天數；兒童 2～10 天）、未滿15歲人壽僅 1～30 天，其餘請以 GPTA／產險試算後手填'; }
     }
     if (v) v.textContent = txt;
     if (sub) { sub.textContent = subTxt; sub.classList.toggle('warn', !!(st.legacy || (st.noTime && !st.kept))); }
@@ -775,7 +775,7 @@
     // 查無費率時（申根人壽／產險超過 DM 天數）直接在這裡手填保費
     h += '<div class="grid g2 quick-prem">' +
       (hasLife ? field('人壽保費（元）', b + 'life.premium', { ph: 'GPTA 試算後填入', hint: '查表有值會自動帶入；可手改' }) : '') +
-      (hasProp ? field('產險保費（元）', b + 'property.premium', { ph: '產險試算後填入', hint: '2～20、25、30 天自動（DM＋B2B 試算）；其他天數手填' }) : '') +
+      (hasProp ? field('產險保費（元）', b + 'property.premium', { ph: '產險試算後填入', hint: '成人 2～60 天自動（DM＋B2B 試算；部分保額天數較少）；其他手填' }) : '') +
       '</div>';
     h += '<p class="hint" data-life-prem-tip="' + i + '"></p>';
     h += '<p class="hint" data-prop-prem-tip="' + i + '"></p>';
@@ -1066,7 +1066,7 @@
     if (dsC.days > 180 && Q.plans.some(function (p) { return p.life && p.life.enabled; })) add('err', '共 ' + dsC.days + ' 天：Go安行國外旅遊最高投保天數為 180 天（DM 第2頁）。');
     var riC = TQ.regionInfo(Q.destination);
     if (riC.ambiguous.length) add('warn', '目的地含「' + riC.ambiguous.join('、') + '」：DM 未明列是否屬「美國、加拿大」或「歐洲」，人壽 OH1 地區限額預設 100%；如確認適用請到「行程進階」手動調整。');
-    if (dsC.days > 30) add('warn', '共 ' + dsC.days + ' 天：人壽亞洲14國可自動算到 180 天；產險費率僅 2～20、25、30 天（部分保額）、未滿15歲人壽僅 1～30 天，其餘請以 GPTA／產險試算後手填。');
+    if (dsC.days > 30) add('warn', '共 ' + dsC.days + ' 天：人壽亞洲14國可自動算到 180 天；產險成人 200／500／1000萬可到 60 天（300萬 2～30 天缺 12～14、16～20；1500萬部分天數；兒童 2～10 天）、未滿15歲人壽僅 1～30 天，其餘請以 GPTA／產險試算後手填。');
     Q.plans.forEach(function (p) {
       var n = p.name || '';
       if (p.life && p.life.enabled) {
