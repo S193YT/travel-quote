@@ -1125,7 +1125,7 @@
     return {
       found: true,
       premium: prem,
-      tip: '自動：' + comma(prem) + ' 元（' + preset.label + '／' + d + '天／' + (d <= 10 ? 'DM' : 'B2B 系統試算 ' + ((d <= 20 || d === 25 || d === 30) ? '2026-10-07' : '2026-10-08')) + '）',
+      tip: '自動：' + comma(prem) + ' 元（' + preset.label + '／' + d + '天／' + (d <= 10 ? 'DM' : (preset.premiumSource && (preset.premiumSource.peerDays || []).indexOf(d) >= 0) ? '同事站 nanen-travel-quote B2B 試算 (比對一致)' : 'B2B 系統試算 ' + ((d <= 20 || d === 25 || d === 30) ? '2026-10-07' : '2026-10-08')) + '）',
       preset: preset,
       dayMin: minD,
       dayMax: maxD
